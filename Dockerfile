@@ -25,4 +25,3 @@ RUN pip install --no-cache-dir \
 
 COPY . /app
 WORKDIR /app
-CMD [ "python3", "-m","landsat.worker-LS" ]

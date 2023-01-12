@@ -4,7 +4,6 @@ services:
   app:
     build:
       context: ../
-      dockerfile: landsat/Dockerfile
     network_mode: host
     environment:
       - REDIS_HOST=localhost
@@ -15,3 +14,4 @@ services:
       - AWS_DEFAULT_REGION=
       - S3_ENDPOINT=
       - S3_BUCKET=
+    command: [ "python3", "-m","landsat.worker-LS" ]
