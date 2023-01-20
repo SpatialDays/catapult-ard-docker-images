@@ -1,32 +1,30 @@
 version: '3'
 
 services:
-  redis-master:
-    image: redis
-    container_name: redis-master
-    ports:
-      - "6379:6379"
-    restart: always
-    command: redis-server --appendonly yes
-    volumes:
-      - ./redisdata:/data
+  # redis-master:
+  #   image: redis
+  #   container_name: redis-master
+  #   ports:
+  #     - "6379:6379"
+  #   restart: always
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - ./redisdata:/data
   
-  jupyter-worker:
+  sentinel2-ard:
     build:
-      context: ./
-      dockerfile: Dockerfile-devel
+      context: ../
+    network_mode: host
     environment:
       - LOGLEVEL=DEBUG
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL}
-      - COPERNICUS_USERNAME=${COPERNICUS_USERNAME}
-      - COPERNICUS_PWD=${COPERNICUS_PWD}
-      - GCP_PRIVATE_KEY=${GCP_PRIVATE_KEY}
-      - GCP_CLIENT_EMAIL=${GCP_CLIENT_EMAIL}
-    ports:
-      - "8877:8888"
-    volumes:
-      - ./data:/tmp/data
-      - ./workflows:/opt/notebooks
-    restart: always
+      - REDIS_HOST=localhost
+      - REDIS_PORT=30000
+      - REDIS_S2_PROCESSED_CHANNEL=jobS2
+      - AWS_ACCESS_KEY_ID=
+      - AWS_SECRET_ACCESS_KEY=
+      - AWS_DEFAULT_REGION=
+      - S3_ENDPOINT=https://s3.amazonaws.com
+      - S3_BUCKET=
+      - COPERNICUS_USERNAME=
+      - COPERNICUS_PWD=
+    command: ["python3", "-m","sentinel-2-l2a.worker-s2"]

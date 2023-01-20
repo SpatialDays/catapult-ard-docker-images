@@ -21,7 +21,10 @@ RUN conda install --quiet --yes \
 
 RUN pip install --no-cache-dir \
     asynchronousfilereader \
-    redis 
+    redis \
+    google-api-python-client \
+    google-cloud-storage \
+    sentinelsat 
 
 COPY . /app
 WORKDIR /app

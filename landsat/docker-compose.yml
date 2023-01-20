@@ -1,7 +1,7 @@
 version: '3'
 
 services:
-  app:
+  landsat8-ard:
     build:
       context: ../
     network_mode: host

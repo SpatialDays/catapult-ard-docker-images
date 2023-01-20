@@ -7,7 +7,7 @@ import zipfile
 import uuid
 from subprocess import Popen, PIPE, STDOUT
 
-from utils.prep_utils import *
+from workflows.utils.prep_utils import *
 
 
 def download_s2_granule_gcloud(s2_id, inter_dir, download_dir, safe_form=True, bands=False):
@@ -166,6 +166,10 @@ def download_extract_s2_esa(scene_uuid, down_dir, original_scene_dir):
     :param original_scene_dir: 
     :return: 
     """
+    logger = logging.getLogger(__name__)
+    logger.info(f"scene_uuid: {scene_uuid}")
+    logger.info(f"down_dir: {down_dir}")
+    logger.info(f"original_scene_dir: {original_scene_dir}")
     # if unzipped .SAFE file doesn't exist then we must do something
     if not os.path.exists(original_scene_dir):
 
@@ -401,8 +405,9 @@ def yaml_prep_s2(scene_dir):
 # @click.option("--prodlevel", default="L1C", help="Desired Sentinel-2 product level. Defaults to 'L1C'. Use 'L2A' for ARD equivalent")
 # @click.option("--source", default="gcloud", help="Api source to be used for downloading scenes.")
 
-def prepareS2(in_scene, s3_bucket='', s3_dir='fiji/Sentinel_2_test/', inter_dir='/tmp/data/intermediate/',
-              prodlevel='L2A'):
+def prepareS2(title, s3_bucket, s3_dir, inter_dir='/tmp/data/intermediate/',
+              prodlevel='L2A', **kwargs):
+    in_scene = title
     """
     Prepare IN_SCENE of Sentinel-2 satellite data into OUT_DIR for ODC indexing. 
 
@@ -472,17 +477,17 @@ def prepareS2(in_scene, s3_bucket='', s3_dir='fiji/Sentinel_2_test/', inter_dir=
                 root.exception(f"{in_scene} {scene_name} UNAVAILABLE via ESA too")
                 raise Exception('Download Error ESA', e)
 
-        # [CREATE L2A WITHIN TEMP DIRECTORY]
-        if ('MSIL1C' in in_scene) & (prodlevel == 'L2A'):
-            root.info(f"{in_scene} {scene_name} Sen2Cor Processing")
-            try:
-                sen2cor_correction(sen2cor8, down_dir, inter_dir)
-                l2a_dir = glob.glob(inter_dir + '*L2A*.SAFE*')[0] + '/'
-                down_dir = l2a_dir
-                root.info(f"{in_scene} {scene_name} Sen2Cor COMPLETE")
-            except Exception as e:
-                root.exception(f"{in_scene} {scene_name} sen2cor FAILED")
-                raise Exception('Sen2Cor Error', e)
+        # # [CREATE L2A WITHIN TEMP DIRECTORY]
+        # if ('MSIL1C' in in_scene) & (prodlevel == 'L2A'):
+        #     root.info(f"{in_scene} {scene_name} Sen2Cor Processing")
+        #     try:
+        #         # sen2cor_correction(sen2cor8, down_dir, inter_dir)
+        #         l2a_dir = glob.glob(inter_dir + '*L2A*.SAFE*')[0] + '/'
+        #         down_dir = l2a_dir
+        #         root.info(f"{in_scene} {scene_name} Sen2Cor COMPLETE")
+        #     except Exception as e:
+        #         root.exception(f"{in_scene} {scene_name} sen2cor FAILED")
+        #         raise Exception('Sen2Cor Error', e)
 
         # CONVERT TO COGS TO TEMP COG DIRECTORY**
         try:
