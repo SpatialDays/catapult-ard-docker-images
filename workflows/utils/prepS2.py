@@ -434,7 +434,7 @@ def prepareS2(title, s3_bucket, s3_dir, inter_dir='/tmp/data/intermediate/',
     if '_MSIL1C_' in in_scene:
         scene_name = scene_name.replace('_MSIL1C_','_MSIL2A_')
 
-        sen2cor8 = os.environ.get("SEN2COR_8")
+        sen2cor8 = '/Sen2Cor-02.08.00-Linux64/bin/L2A_Process'
 
     # Unique inter_dir needed for clean-up
     inter_dir = inter_dir + scene_name + '_tmp/'
