@@ -478,16 +478,16 @@ def prepareS2(title, s3_bucket, s3_dir, inter_dir='/tmp/data/intermediate/',
                 raise Exception('Download Error ESA', e)
 
         # # [CREATE L2A WITHIN TEMP DIRECTORY]
-        # if ('MSIL1C' in in_scene) & (prodlevel == 'L2A'):
-        #     root.info(f"{in_scene} {scene_name} Sen2Cor Processing")
-        #     try:
-        #         # sen2cor_correction(sen2cor8, down_dir, inter_dir)
-        #         l2a_dir = glob.glob(inter_dir + '*L2A*.SAFE*')[0] + '/'
-        #         down_dir = l2a_dir
-        #         root.info(f"{in_scene} {scene_name} Sen2Cor COMPLETE")
-        #     except Exception as e:
-        #         root.exception(f"{in_scene} {scene_name} sen2cor FAILED")
-        #         raise Exception('Sen2Cor Error', e)
+        if ('MSIL1C' in in_scene) & (prodlevel == 'L2A'):
+            root.info(f"{in_scene} {scene_name} Sen2Cor Processing")
+            try:
+                sen2cor_correction(sen2cor8, down_dir, inter_dir)
+                l2a_dir = glob.glob(inter_dir + '*L2A*.SAFE*')[0] + '/'
+                down_dir = l2a_dir
+                root.info(f"{in_scene} {scene_name} Sen2Cor COMPLETE")
+            except Exception as e:
+                root.exception(f"{in_scene} {scene_name} sen2cor FAILED")
+                raise Exception('Sen2Cor Error', e)
 
         # CONVERT TO COGS TO TEMP COG DIRECTORY**
         try:

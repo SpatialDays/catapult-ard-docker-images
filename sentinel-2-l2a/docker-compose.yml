@@ -27,4 +27,5 @@ services:
       - S3_BUCKET=
       - COPERNICUS_USERNAME=
       - COPERNICUS_PWD=
+      - SEN2COR_8='/Sen2Cor-02.08.00-Linux64/bin/L2A_Process'
     command: ["python3", "-m","sentinel-2-l2a.worker-s2"]
