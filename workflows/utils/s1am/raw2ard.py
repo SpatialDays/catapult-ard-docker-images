@@ -30,7 +30,7 @@ class Raw2Ard:
 #             self._base = xmltodict.parse( fd.read() )
 
 #         with open ( os.getenv( 'S1_PROCESS_P1A' ) ) as fd: # make var path
-        with open ( './utils/s1am/recipes/cs_base.xml' ) as fd: # make var path
+        with open ( '/app/workflows/utils/s1am/recipes/cs_base.xml' ) as fd: # make var path
             self._pt1 = xmltodict.parse( fd.read() )
 
         self._densify = DensifyGrid()

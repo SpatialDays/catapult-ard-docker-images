@@ -12,9 +12,9 @@ from urllib.error import HTTPError
 import uuid
 from sentinelsat import SentinelAPI
 
-from utils.prep_utils import *
+from workflows.utils.prep_utils import *
 
-from utils.s1am.raw2ard import Raw2Ard
+from workflows.utils.s1am.raw2ard import Raw2Ard
 
 cookie_jar_path = os.path.join( os.path.expanduser('~'), ".bulk_download_cookiejar.txt")
 cookie_jar = MozillaCookieJar()
@@ -207,12 +207,15 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
             copernicus_pwd = os.getenv("COPERNICUS_PWD")
             logging.debug(f"ESA username: {copernicus_username}")
             esa_api = SentinelAPI(copernicus_username, copernicus_pwd)
+            logging.info(f"Scene uuid is: {scene_uuid}")
             esa_api.download(scene_uuid, down_dir, checksum=True)
         # extract downloaded .zip file
 #         logging.info('Extracting ESA scene: {}'.format(original_scene_dir))
 #         zip_ref = zipfile.ZipFile(original_scene_dir.replace('.SAFE/', '.zip'), 'r')
 #         zip_ref.extractall(os.path.dirname(down_dir))
 #         zip_ref.close()
+            # log out the folder where the scene is
+            logging.info('ESA scene downloaded to: {}'.format(original_scene_dir))
 
     else:
         logging.warning('ESA scene already extracted: {}'.format(original_scene_dir))
@@ -303,11 +306,15 @@ def yaml_prep_s1(scene_dir):
     logging.info("Preparing scene {}".format(scene_name))
     logging.info("Scene path {}".format(scene_dir))
 
+    logging.info(f"scene_dir: {scene_dir}")
     prod_paths = glob.glob(os.path.join(scene_dir, '*.tif'))
+    # also add .tiff files
+    prod_paths.extend(glob.glob(os.path.join(scene_dir, '*.tiff')))
 
     logging.info(f"prod_path: {prod_paths}, scene_name: {scene_name}")
     t0 = parse(str(datetime.strptime(scene_name.split("_")[-2], '%Y%m%dT%H%M%S')))
 
+    logging.info(f"Product paths are: {prod_paths}")
     # get polorisation from each image product (S1 band)
     # should be replaced with a more concise, generalisable parsing
     images = {
@@ -353,8 +360,9 @@ def yaml_prep_s1(scene_dir):
     }
 
 
-def prepareS1AM(in_scene, chunks=24, ext_dem=True, s3_bucket='', s3_dir='common_sensing/sentinel_1/', inter_dir='/tmp/data/intermediate/',
-                source='asf'):
+def prepareS1AM(title, chunks=24, ext_dem=True, s3_bucket='', s3_dir='common_sensing/sentinel_1/', inter_dir='/tmp/data/intermediate/',
+                source='asf', **kwargs):
+    in_scene = title
     """
     Prepare IN_SCENE of Sentinel-1 satellite data into OUT_DIR for ODC indexing. 
 

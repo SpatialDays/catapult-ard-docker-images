@@ -1,37 +1,30 @@
 version: '3'
 
 services:
-  redis-master:
-    image: redis
-    container_name: redis-master
-    ports:
-      - "6378:6379"
-    restart: always
-    command: redis-server --appendonly yes
-    volumes:
-      - ./redisdata:/data
+  # redis-master:
+  #   image: redis
+  #   container_name: redis-master
+  #   ports:
+  #     - "6379:6379"
+  #   restart: always
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - ./redisdata:/data
   
-  jupyter-worker:
+  sentinel1-am-ard:
     build:
-      context: ./
-      dockerfile: Dockerfile-devel
+      context: ../
+    network_mode: host
     environment:
       - LOGLEVEL=DEBUG
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL}
-      - ASF_USERNAME=${ASF_USERNAME}
-      - ASF_PWD=${ASF_PWD}
-      - COPERNICUS_USERNAME=${COPERNICUS_USERNAME}
-      - COPERNICUS_PWD=${COPERNICUS_PWD}
-      - S1_PROCESS_P1A=${S1_PROCESS_P1A}
-      - S1_PROCESS_P2A=${S1_PROCESS_P2A}
-      - S1_PROCESS_P3A=${S1_PROCESS_P3A}
-      - S1_PROCESS_P4A=${S1_PROCESS_P4A}
-      - SNAP_GPT=${SNAP_GPT}
-    ports:
-      - "8800:8888"
-    volumes:
-      - ./data:/tmp/data
-      - ./workflows:/opt/notebooks
-    restart: always
+      - REDIS_HOST=
+      - REDIS_PORT=
+      - REDIS_S2_PROCESSED_CHANNEL=jobS1
+      - AWS_ACCESS_KEY_ID=
+      - AWS_SECRET_ACCESS_KEY=
+      - AWS_DEFAULT_REGION=
+      - S3_ENDPOINT=
+      - S3_BUCKET=
+      - COPERNICUS_USERNAME=
+      - COPERNICUS_PWD=
+    command: ["python3", "-m","sentinel-1-backscatter-am.worker-s1-am"]
