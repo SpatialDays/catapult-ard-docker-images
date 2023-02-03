@@ -25,7 +25,7 @@ if __name__ == "__main__":
         redis = redis.Redis(host=host, port=port)
 
         while True:
-            item = redis.blpop(redis_queue, timeout=1)
+            item = redis.blpop(redis_queue, timeout=60)
             if item is not None:
                 item_decoded = item[1].decode("utf=8")
                 logger.info(f"Working on {item_decoded}")
@@ -36,7 +36,6 @@ if __name__ == "__main__":
                 logger.info(f"Total processing time {end - start}")
             else:
                 logger.info("No work found in queue")
-                break
 
         logger.info("Queue empty, exiting")
         exit(0)

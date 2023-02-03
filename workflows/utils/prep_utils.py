@@ -443,6 +443,7 @@ def s3_download(s3_bucket, s3_obj_path, dest_path):
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == "404":
             print("The object does not exist.")
+            raise
         else:
             raise
 
