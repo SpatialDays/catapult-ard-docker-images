@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ard-docker-images-sentinel2
+spec:
+  replicas: ${NUM_REPLICAS}
+  template:
+    spec:
+      containers:
+      - name: s3proxy
+        image: andrewgaul/s3proxy:sha-b5d090d
+        env:
+          - name: S3PROXY_ENDPOINT
+            value: "http://0.0.0.0:80"
+          - name: S3PROXY_AUTHORIZATION
+            value: "none"
+          - name: JCLOUDS_PROVIDER
+            value: "azureblob"
+          - name: JCLOUDS_IDENTITY
+            value: ${AZURE_STORAGE_ACCOUNT}
+          - name: JCLOUDS_ENDPOINT
+            value: ${AZURE_STORAGE_ENDPOINT}
+          - name: JCLOUDS_CREDENTIAL
+            value: ${AZURE_STORAGE_CONNECTION_STRING}
+      - name: ard-docker-images-sentinel2
+        image: ivicamaticsd/catapult-ard-docker-images:latest
+        imagePullPolicy: Always
+        command: ["python3", "-m","sentinel-2-l2a.worker-s2"]
+        env:
+            ### This keys need to exist, but because we are using s3proxy, they are not used 
+          - name: AWS_ACCESS_KEY_ID
+            value: "aws-access-key-id"
+          - name: AWS_SECRET_ACCESS_KEY
+            value: "aws-secret-access-key"
+          - name: AWS_DEFAULT_REGION
+            value: "eu-west-2"
+            ################################################################################
+          - name: REDIS_HOST
+            value: ${REDIS_HOST}
+          - name: REDIS_PORT
+            value: ${REDIS_PORT}
+          - name: S3_ENDPOINT
+            value: "http://localhost:80"
+          - name: S3_BUCKET
+            value: ${AWS_BUCKET}
+          - name: COPERNICUS_USERNAME
+            value: ${COPERNICUS_USERNAME}
+          - name: COPERNICUS_PASSWORD
+            value: ${COPERNICUS_PASSWORD}
+      
