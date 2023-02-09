@@ -16,10 +16,9 @@ services:
       context: ../
     network_mode: host
     environment:
-      - LOGLEVEL=DEBUG
       - REDIS_HOST=localhost
       - REDIS_PORT=30000
-      - REDIS_S2_PROCESSED_CHANNEL=jobS2
+      - AWS_ACCESS_KEY_ID=AKIA2GUC6LBMKP5ICEV3
       - AWS_ACCESS_KEY_ID=
       - AWS_SECRET_ACCESS_KEY=
       - AWS_DEFAULT_REGION=
