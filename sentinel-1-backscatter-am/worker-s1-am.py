@@ -29,7 +29,7 @@ if __name__ == "__main__":
         redis = redis.Redis(host=host, port=port)
 
         while True:
-            item = redis.blpop(redis_queue, timeout=1)
+            item = redis.blpop(redis_queue, timeout=10)
             if item is not None:
                 itemstr = item[1].decode("utf=8")
                 logger.info(f"Working on {itemstr}")

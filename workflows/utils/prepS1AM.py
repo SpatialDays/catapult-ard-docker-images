@@ -11,7 +11,7 @@ from urllib.request import Request, HTTPHandler, HTTPSHandler, HTTPCookieProcess
 from urllib.error import HTTPError
 import uuid
 from sentinelsat import SentinelAPI
-
+from time import sleep
 from workflows.utils.prep_utils import *
 
 from workflows.utils.s1am.raw2ard import Raw2Ard
@@ -209,11 +209,12 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
             esa_api = SentinelAPI(copernicus_username, copernicus_pwd)
             logging.info(f"Scene uuid is: {scene_uuid}")
             esa_api.download(scene_uuid, down_dir, checksum=True)
-        # extract downloaded .zip file
-#         logging.info('Extracting ESA scene: {}'.format(original_scene_dir))
-#         zip_ref = zipfile.ZipFile(original_scene_dir.replace('.SAFE/', '.zip'), 'r')
-#         zip_ref.extractall(os.path.dirname(down_dir))
-#         zip_ref.close()
+            # extract downloaded .zip file
+            # logging.info('Extracting ESA scene: {}'.format(original_scene_dir))
+            # zip_ref = zipfile.ZipFile(original_scene_dir.replace('.SAFE/', '.zip'), 'r')
+            # zip_ref.extractall(os.path.dirname(down_dir))
+            # zip_ref.close()
+
             # log out the folder where the scene is
             logging.info('ESA scene downloaded to: {}'.format(original_scene_dir))
 
@@ -305,7 +306,7 @@ def yaml_prep_s1(scene_dir):
     scene_name = scene_dir.split('/')[-2]
     logging.info("Preparing scene {}".format(scene_name))
     logging.info("Scene path {}".format(scene_dir))
-
+    # log the scene_dir
     logging.info(f"scene_dir: {scene_dir}")
     prod_paths = glob.glob(os.path.join(scene_dir, '*.tif'))
     # also add .tiff files
@@ -315,6 +316,7 @@ def yaml_prep_s1(scene_dir):
     t0 = parse(str(datetime.strptime(scene_name.split("_")[-2], '%Y%m%dT%H%M%S')))
 
     logging.info(f"Product paths are: {prod_paths}")
+
     # get polorisation from each image product (S1 band)
     # should be replaced with a more concise, generalisable parsing
     images = {
@@ -415,12 +417,11 @@ def prepareS1AM(title, chunks=24, ext_dem=True, s3_bucket='', s3_dir='common_sen
     root.info('{} {} Starting'.format(in_scene, scene_name))
 
     try:
-
         #  DOWNLOAD
         try:
             root.info(f"{in_scene} {scene_name} DOWNLOADING via ASF")
             download_extract_s1_scene_asf(in_scene, inter_dir)
-#             raise Exception('skipping asf for testing')
+            # raise Exception('skipping asf for testing')
             root.info(f"{in_scene} {scene_name} DOWNLOADED via ASF")
         except Exception as e:
             root.exception(e)
@@ -440,11 +441,16 @@ def prepareS1AM(title, chunks=24, ext_dem=True, s3_bucket='', s3_dir='common_sen
             # Download external DEMs
             ext_dem_path_E = "common_sensing/ancillary_products/SRTM1Sec/SRTM30_Fiji_E.tif"
             ext_dem_path_W = "common_sensing/ancillary_products/SRTM1Sec/SRTM30_Fiji_W.tif"
-            ext_dem_E = f'{inter_dir}SRTM30_Fiji_E.tif'
-            ext_dem_W = f'{inter_dir}SRTM30_Fiji_W.tif'
+
+            ext_dem_E = f'/app/dem/SRTM30_Fiji_E.tif'
+            ext_dem_W = f'/app/dem/SRTM30_Fiji_W.tif'
             if not os.path.exists(ext_dem_E):
+                logging.info(f"Downloading DEM")
                 s3_download(s3_bucket, ext_dem_path_E, ext_dem_E)
                 s3_download(s3_bucket, ext_dem_path_W, ext_dem_W)
+                logging.info(f"DEM downloaded")
+            else:
+                logging.info(f"DEM already downloaded")
             root.info(f"{in_scene} {scene_name} DOWNLOADED E+W DEMs")
         except Exception as e:
             root.exception(e)
@@ -504,6 +510,7 @@ def prepareS1AM(title, chunks=24, ext_dem=True, s3_bucket='', s3_dir='common_sen
     except Exception as e:
         logging.error(f"could not process {scene_name} {e}")
         print('boo')
+        sleep(3600)
         clean_up(inter_dir)
 
 
