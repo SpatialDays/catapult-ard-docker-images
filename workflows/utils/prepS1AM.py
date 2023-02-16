@@ -1,8 +1,8 @@
 from dateutil.parser import parse
 import glob
-from http.cookiejar import MozillaCookieJar
 import uuid
 from sentinelsat import SentinelAPI
+from zipfile import ZipFile
 
 from utils.prep_utils import *
 
@@ -46,7 +46,8 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
     if not os.path.exists(original_scene_dir):
 
         # if downloaded .zip file doesn't exist then download it
-        if not os.path.exists(original_scene_dir.replace('.SAFE/', '.zip')):
+        zip_file_path = original_scene_dir.replace('.SAFE/', '.zip')
+        if not os.path.exists(zip_file_path):
             logging.info('Downloading ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
 
             copernicus_username = os.getenv("COPERNICUS_USERNAME")
@@ -58,6 +59,11 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
                 esa_api.download(scene_uuid, down_dir, checksum=True)
             except Exception as e:
                 raise DownloadError(f"Error downloading {scene_uuid} from ESA hub: {e}")
+
+            logging.info('Unzipping ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
+            with ZipFile(zip_file_path, 'r') as zip_file:
+                zip_file.extractall(os.path.dirname(down_dir))
+
 
     else:
         logging.warning('ESA scene already extracted: {}'.format(original_scene_dir))
@@ -100,14 +106,10 @@ def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, overwrite=Fal
     if not os.path.exists(cog_scene_dir):
         logging.warning('Creating scene cog directory: {}'.format(cog_scene_dir))
         os.mkdir(cog_scene_dir)
-
-    des_prods = ["Gamma0_VV_db",
-                 "Gamma0_VH_db",
-                 "LayoverShadow_MASK_VH"]  # to ammend once outputs finalised - TO DO*****
-
-    # find all individual prods to convert to cog (ignore true colour images (TCI))
-    prod_paths = glob.glob(noncog_scene_dir + '*TF_TC*/*.tif')  # - TO DO*****
-    prod_paths = [x for x in prod_paths if os.path.basename(x)[:-4] in des_prods]
+    
+    prod_paths = discover_tiffs(noncog_scene_dir)
+    
+    logging.info(f"found {len(prod_paths)} products to convert to cog from {noncog_scene_dir}")
 
     # iterate over prods to create parellel processing list
     for prod in prod_paths:
@@ -148,12 +150,7 @@ def yaml_prep_s1(scene_dir):
     scene_dir = '/'.join(scene_dir)
     logging.info("Scene path {}".format(scene_dir)) # /tmp/data/intermediate/S1A_IW_GRDH_1SDV_20230118T174108_tmp
 
-    prod_paths = []
-    for root, dirs, files in os.walk(scene_dir):
-        for file in files:
-            if file.endswith('.tiff'):
-                prod_paths.append(os.path.join(root, file))
-    
+    prod_paths = discover_tiffs(scene_dir)
     logging.debug(f"Found {len(prod_paths)} products")
 
     t0 = parse(str(datetime.strptime(scene_name.split("_")[-2], '%Y%m%dT%H%M%S')))
@@ -227,6 +224,7 @@ def prepareS1AM(in_scene, chunks=24, s3_bucket='public-eo-data', s3_dir='common_
 
     down_zip = inter_dir + in_scene.replace('.SAFE','.zip')
     am_dir = down_zip.replace('.zip', 'Orb_Cal_Deb_ML_TF_TC_dB/')
+    down_dir = inter_dir + in_scene + '/'
 
     root.info('{} {} Starting'.format(in_scene, scene_name))
 
@@ -237,7 +235,7 @@ def prepareS1AM(in_scene, chunks=24, s3_bucket='public-eo-data', s3_dir='common_
             s1id = find_s1_uuid(in_scene)
             logging.debug(s1id)
             root.info(f"{in_scene} {scene_name}: Available for download from ESA")
-            # download_extract_s1_esa(s1id, inter_dir, down_dir)
+            download_extract_s1_esa(s1id, inter_dir, down_dir)
             root.info(f"{in_scene} {scene_name}: Downloaded from ESA")
         except Exception as e:
             root.exception(f"{in_scene} {scene_name}: Failed to download from ESA")
@@ -287,8 +285,8 @@ def prepareS1AM(in_scene, chunks=24, s3_bucket='public-eo-data', s3_dir='common_
             raise Exception(f"S3 upload error: {e}")
 
 
-        # DELETE ANYTHING WITHIN THE TEMP DIRECTORY
-        clean_up(inter_dir)
+        # Delete temporary files
+        # clean_up(inter_dir)
 
     except Exception as e:
         logging.error(f"could not process {scene_name} {e}")
