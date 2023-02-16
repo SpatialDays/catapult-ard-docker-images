@@ -13,12 +13,12 @@ root = setup_logging()
 
 def find_s1_uuid(s1_filename):
     """
-    Returns S2 uuid required for download via sentinelsat, based upon an input S2 file/scene name. 
-    I.e. S2A_MSIL1C_20180820T223011_N0206_R072_T60KWE_20180821T013410
+    Returns S1 uuid required for download via sentinelsat, based upon an input S1 file/scene name. 
+    I.e. S1A_MSIL1C_20180820T223011_N0206_R072_T60KWE_20180821T013410
     Assumes esa hub creds stored as env variables.
     
-    :param s2_file_name: Sentinel-2 scene name
-    :return s2_uuid: download id
+    :param S1_file_name: Sentinel-2 scene name
+    :return S1_uuid: download id
     """
     copernicus_username = os.getenv("COPERNICUS_USERNAME")
     copernicus_pwd = os.getenv("COPERNICUS_PWD")
@@ -33,11 +33,11 @@ def find_s1_uuid(s1_filename):
         
 def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
     """
-    Download a single S2 scene from ESA via sentinelsat 
+    Download a single S1 scene from ESA via sentinelsat 
     based upon uuid. 
     Assumes esa hub creds stored as env variables.
     
-    :param scene_uuid: S2 download uuid from sentinelsat query
+    :param scene_uuid: S1 download uuid from sentinelsat query
     :param down_dir: directory in which to create a downloaded product dir
     :param original_scene_dir: 
     :return: 
@@ -121,7 +121,7 @@ def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, overwrite=Fal
 
 def copy_s1_metadata(out_s1_prod, cog_scene_dir, scene_name):
     """
-    Parse through S2 metadtaa .xml for either l1c or l2a S2 scenes.
+    Parse through S1 metadtaa .xml for either l1c or l2a S1 scenes.
     """
 
     if os.path.exists(out_s1_prod):
