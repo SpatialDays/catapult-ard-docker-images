@@ -44,6 +44,15 @@ def to_cog(input_file, output_file, nodata=0):
         logging.warning(f'cannot find product: {input_file}')
 
 
+def discover_tiffs(in_dir):
+    prod_paths = []
+    for root, dirs, files in os.walk(in_dir):
+        for file in files:
+            if file.endswith('.tiff') or file.endswith('.tif'):
+                prod_paths.append(os.path.join(root, file))
+    return prod_paths
+
+
 def conv_sgl_cog(in_path, out_path, nodata=0):
     # set default cog profile (as recommended by alex leith)
     cog_profile = {
