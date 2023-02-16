@@ -4,9 +4,9 @@ import uuid
 from sentinelsat import SentinelAPI
 from zipfile import ZipFile
 
-from utils.prep_utils import *
+from workflows.utils.prep_utils import *
 
-from utils.s1am.raw2ard import Raw2Ard
+from workflows.utils.s1am.raw2ard import Raw2Ard
 
 
 root = setup_logging()
@@ -68,10 +68,10 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
     else:
         logging.warning('ESA scene already extracted: {}'.format(original_scene_dir))
 
-    # remove zipped scene but onliy if unzipped 
-    if os.path.exists(original_scene_dir) & os.path.exists(original_scene_dir.replace('.SAFE/', '.zip')):
-        logging.info('Deleting ESA scene zip: {}'.format(original_scene_dir.replace('.SAFE/', '.zip')))
-        os.remove(original_scene_dir.replace('.SAFE/', '.zip'))
+    # # remove zipped scene but onliy if unzipped 
+    # if os.path.exists(original_scene_dir) & os.path.exists(original_scene_dir.replace('.SAFE/', '.zip')):
+    #     logging.info('Deleting ESA scene zip: {}'.format(original_scene_dir.replace('.SAFE/', '.zip')))
+    #     os.remove(original_scene_dir.replace('.SAFE/', '.zip'))
 
 
 def band_name_s1(prod_path):
@@ -198,7 +198,8 @@ def yaml_prep_s1(scene_dir):
     }
 
 
-def prepareS1AM(in_scene, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sensing/sentinel_1/', inter_dir='/tmp/data/intermediate/'):
+def prepareS1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sensing/sentinel_1/', inter_dir='/tmp/data/intermediate/', **kwargs):
+    in_scene = title
     """
     Prepare a Sentinel-1 scene (L1C or L2A) for indexing in ODC by converting it to COGs.
 
