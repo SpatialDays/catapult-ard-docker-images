@@ -30,7 +30,8 @@ def find_s1_uuid(s1_filename):
         res = esa_api.to_geodataframe(res)
 
         return res.uuid.values[0]
-        
+
+
 def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
     """
     Download a single S1 scene from ESA via sentinelsat 
@@ -63,7 +64,6 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
             logging.info('Unzipping ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
             with ZipFile(zip_file_path, 'r') as zip_file:
                 zip_file.extractall(os.path.dirname(down_dir))
-
 
     else:
         logging.warning('ESA scene already extracted: {}'.format(original_scene_dir))
@@ -106,9 +106,9 @@ def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, overwrite=Fal
     if not os.path.exists(cog_scene_dir):
         logging.warning('Creating scene cog directory: {}'.format(cog_scene_dir))
         os.mkdir(cog_scene_dir)
-    
+
     prod_paths = discover_tiffs(noncog_scene_dir)
-    
+
     logging.info(f"found {len(prod_paths)} products to convert to cog from {noncog_scene_dir}")
 
     # iterate over prods to create parellel processing list
@@ -144,7 +144,7 @@ def yaml_prep_s1(scene_dir):
     angle or layover/foreshortening masks
     """
     scene_name = scene_dir.split('/')[-2]
-    
+
     # Get rid of the last part of the path
     scene_dir = scene_dir.split('/')[0:-1]
     scene_dir = '/'.join(scene_dir)
@@ -195,7 +195,6 @@ def yaml_prep_s1(scene_dir):
         'lineage': {
             'source_datasets': {},
         }
-
     }
 
 
