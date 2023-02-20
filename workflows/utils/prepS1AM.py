@@ -3,7 +3,10 @@ import glob
 import uuid
 from sentinelsat import SentinelAPI
 from zipfile import ZipFile
+import xml.etree.ElementTree as ET
 
+# TODO ADD TO REQUIREMENTS
+from bs4 import BeautifulSoup
 from workflows.utils.prep_utils import *
 
 from workflows.utils.s1am.raw2ard import Raw2Ard
@@ -61,9 +64,10 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
             except Exception as e:
                 raise DownloadError(f"Error downloading {scene_uuid} from ESA hub: {e}")
 
-            logging.info('Unzipping ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
-            with ZipFile(zip_file_path, 'r') as zip_file:
-                zip_file.extractall(os.path.dirname(down_dir))
+            # Seemingly we don't need this
+            # logging.info('Unzipping ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
+            # with ZipFile(zip_file_path, 'r') as zip_file:
+            #     zip_file.extractall(os.path.dirname(down_dir))
 
     else:
         logging.warning('ESA scene already extracted: {}'.format(original_scene_dir))
@@ -84,8 +88,9 @@ def band_name_s1(prod_path):
 
     if '-vh-' in str(prod_name):
         return 'vh'
-    if '-vv-' in str(prod_name):
+    elif '-vv-' in str(prod_name):
         return 'vv'
+    # TODO: Work needed to find new name 
     if 'LayoverShadow_MASK' in str(prod_name):
         return 'layovershadow_mask'
 
@@ -119,25 +124,86 @@ def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, overwrite=Fal
         to_cog(prod, out_filename, nodata=-9999)
 
 
-def copy_s1_metadata(out_s1_prod, cog_scene_dir, scene_name):
-    """
-    Parse through S1 metadtaa .xml for either l1c or l2a S1 scenes.
-    """
-
-    if os.path.exists(out_s1_prod):
-
-        meta_base = os.path.basename(out_s1_prod)
-        n_meta = os.path.join(cog_scene_dir + '/' + scene_name + '_' + meta_base)
-        logging.info("Copying original metadata file to cog dir: {}".format(n_meta))
-        if not os.path.exists(n_meta):
-            shutil.copyfile(out_s1_prod, n_meta)
-        else:
-            logging.info("Original metadata file already copied to cog_dir: {}".format(n_meta))
-    else:
-        logging.warning("Cannot find orignial metadata file: {}".format(out_s1_prod))
+def read_manifest(path: str):
+    manifest_path: str = os.path.join(path, 'manifest.safe')
+    try:
+        with open(manifest_path, 'r') as f:
+            manifest: str = f.read()
+    except FileNotFoundError as e:
+        print(f"Manifest file {manifest_path} not found.")
+        raise e
+    return manifest
 
 
-def yaml_prep_s1(scene_dir):
+def extract_crs_and_coordinates(manifest):
+    soup = BeautifulSoup(manifest, 'xml')
+
+    crs_name = soup.find('safe:footPrint')['srsName']
+    coordinates_str = soup.find('gml:coordinates').text
+    epsg_code = crs_name.split('#')[-1]
+    epsg_str = f'EPSG:{epsg_code}'
+
+    coordinates = [tuple(map(float, coord.split(','))) for coord in coordinates_str.split()]
+    return epsg_str, coordinates
+
+
+def get_s1_geometry(path):
+    manifest = read_manifest(path)
+    crs, coordinates = extract_crs_and_coordinates(manifest)
+
+    top = coordinates[2][0] # -17.36727
+    left = coordinates[1][1] # 176.245819
+    right = coordinates[3][1] # 178.9095
+    bottom = coordinates[0][0] # -19.284351
+
+    projection = {
+        'geo_ref_points': {
+            'ul': {
+                'x': left,
+                'y': top
+            },
+            'ur': {
+                'x': right,
+                'y': top
+            },
+            'll': {
+                'x': left,
+                'y': bottom
+            },
+            'lr': {
+                'x': right,
+                'y': bottom
+            }
+        },
+        'spatial_reference': 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433],AUTHORITY["EPSG","4326"]]'
+    }
+
+    extent = {
+        'll' : {
+            'lat': bottom,
+            'lon': left
+        },
+        'lr' : {
+            'lat' : bottom,
+            'lon' : right
+        },
+        'ul' : {
+            'lat' : top,
+            'lon' : left
+        },
+        'ur' : {
+            'lat' : top,
+            'lon' : right
+        }
+    }
+    
+    logging.info(f"projection: {projection}")
+    logging.info(f"extent: {extent}")
+
+    return projection, extent
+
+
+def yaml_prep_s1(scene_dir, down_dir):
     """
     Prepare individual S1 scene directory containing S1 products
     note: doesn't inc. additional ancillary products such as incidence
@@ -163,12 +229,9 @@ def yaml_prep_s1(scene_dir):
         } for prod_path in prod_paths
     }
 
-    # trusting bands coaligned, use one to generate spatial bounds for all
-    try:
-        projection, extent = get_geometry(os.path.join(str(scene_dir), images['vh']['path']))
-    except:
-        projection, extent = get_geometry(os.path.join(str(scene_dir), images['vv']['path']))
-        logging.warning('no vh band available')
+    # read from manifest
+    projection, extent = get_s1_geometry(down_dir)
+
 
     # format metadata (i.e. construct hashtable tree for syntax of file interface)
     return {
@@ -226,8 +289,7 @@ def prepareS1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sen
     am_dir = down_zip.replace('.zip', 'Orb_Cal_Deb_ML_TF_TC_dB/')
     down_dir = inter_dir + in_scene + '/'
 
-    root.info('{} {} Starting'.format(in_scene, scene_name))
-
+    root.info(f'download dir: {down_dir}')
     try:
 
         # Download scene from ESA
@@ -235,7 +297,7 @@ def prepareS1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sen
             s1id = find_s1_uuid(in_scene)
             logging.debug(s1id)
             root.info(f"{in_scene} {scene_name}: Available for download from ESA")
-            download_extract_s1_esa(s1id, inter_dir, down_dir)
+            # download_extract_s1_esa(s1id, inter_dir, down_dir)
             root.info(f"{in_scene} {scene_name}: Downloaded from ESA")
         except Exception as e:
             root.exception(f"{in_scene} {scene_name}: Failed to download from ESA")
@@ -246,27 +308,27 @@ def prepareS1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sen
         ext_dem_path_list = download_external_dems(in_scene, scene_name, tmp_inter_dir, s3_bucket, root)
 
         # Process AM
-        try:
-            root.info(f"{in_scene} {scene_name} Starting AM SNAP processing")
-            obj = Raw2Ard( chunks=chunks, gpt='/opt/snap/bin/gpt' )
-            obj.process(down_zip, am_dir, ext_dem_path_list[0], ext_dem_path_list[1])
-        except Exception as e:
-            root.exception(e)
+        # try:
+        #     root.info(f"{in_scene} {scene_name} Starting AM SNAP processing")
+        #     obj = Raw2Ard( chunks=chunks, gpt='/opt/snap/bin/gpt' )
+        #     obj.process(down_zip, am_dir, ext_dem_path_list[0], ext_dem_path_list[1])
+        # except Exception as e:
+        #     root.exception(e)
 
         # Convert scene to COGs in a temporary directory
-        try:
-            root.info(f"Converting {in_scene} to COGs")
-            conv_s1scene_cogs(inter_dir, cog_dir, scene_name)
-            root.info(f"Finished converting {in_scene} to COGs")
-        except Exception as e:
-            root.exception(f"Failed to convert {in_scene} to COGs")
-            raise Exception(f"COG conversion error: {e}")
+        # try:
+        #     root.info(f"Converting {in_scene} to COGs")
+        #     conv_s1scene_cogs(inter_dir, cog_dir, scene_name)
+        #     root.info(f"Finished converting {in_scene} to COGs")
+        # except Exception as e:
+        #     root.exception(f"Failed to convert {in_scene} to COGs")
+        #     raise Exception(f"COG conversion error: {e}")
 
 
         # Create YAML metadata for the COGs
         try:
             root.info(f"Creating dataset YAML for {in_scene}")
-            metadata = yaml_prep_s1(cog_dir)
+            metadata = yaml_prep_s1(cog_dir, down_dir)
             create_yaml(cog_dir, metadata)
             root.info(f"Finished creating dataset YAML for {in_scene}")
         except Exception as e:
