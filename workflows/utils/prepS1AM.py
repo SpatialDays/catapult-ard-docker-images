@@ -197,10 +197,6 @@ def get_s1_geometry(path):
             'lon' : right
         }
     }
-    
-    logging.info(f"projection: {projection}")
-    logging.info(f"extent: {extent}")
-
     return projection, extent
 
 
@@ -262,7 +258,7 @@ def yaml_prep_s1(scene_dir, down_dir):
     }
 
 
-def prepareS1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sensing/sentinel_1/', inter_dir='/tmp/data/intermediate/', **kwargs):
+def prepare_S1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sensing/sentinel_1/', inter_dir='/tmp/data/intermediate/', **kwargs):
     in_scene = title
     """
     Prepare a Sentinel-1 scene (L1C or L2A) for indexing in ODC by converting it to COGs.
@@ -309,21 +305,21 @@ def prepareS1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sen
         ext_dem_path_list = download_external_dems(in_scene, scene_name, tmp_inter_dir, s3_bucket, root)
 
         # Process AM
-        # try:
-        #     root.info(f"{in_scene} {scene_name} Starting AM SNAP processing")
-        #     obj = Raw2Ard( chunks=chunks, gpt='/opt/snap/bin/gpt' )
-        #     obj.process(down_zip, am_dir, ext_dem_path_list[0], ext_dem_path_list[1])
-        # except Exception as e:
-        #     root.exception(e)
+        try:
+            root.info(f"{in_scene} {scene_name} Starting AM SNAP processing")
+            obj = Raw2Ard( chunks=chunks, gpt='/opt/snap/bin/gpt' )
+            obj.process(down_zip, am_dir, ext_dem_path_list[0], ext_dem_path_list[1])
+        except Exception as e:
+            root.exception(e)
 
         # Convert scene to COGs in a temporary directory
-        # try:
-        #     root.info(f"Converting {in_scene} to COGs")
-        #     conv_s1scene_cogs(inter_dir, cog_dir, scene_name)
-        #     root.info(f"Finished converting {in_scene} to COGs")
-        # except Exception as e:
-        #     root.exception(f"Failed to convert {in_scene} to COGs")
-        #     raise Exception(f"COG conversion error: {e}")
+        try:
+            root.info(f"Converting {in_scene} to COGs")
+            conv_s1scene_cogs(inter_dir, cog_dir, scene_name)
+            root.info(f"Finished converting {in_scene} to COGs")
+        except Exception as e:
+            root.exception(f"Failed to convert {in_scene} to COGs")
+            raise Exception(f"COG conversion error: {e}")
 
 
         # Create YAML metadata for the COGs
@@ -357,4 +353,4 @@ def prepareS1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sen
 
 
 if __name__ == '__main__':
-    prepareS1AM('S1A_IW_GRDH_1SDV_20230118T174108_20230118T174131_046841_059DD6_8B3D', s3_dir='fiji/Sentinel_1_dockertest/')
+    prepare_S1AM('S1A_IW_GRDH_1SDV_20230118T174108_20230118T174131_046841_059DD6_8B3D')
