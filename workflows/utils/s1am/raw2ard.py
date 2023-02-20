@@ -5,6 +5,7 @@ import math
 import copy
 import shutil
 import xmltodict
+import logging
 
 from . import metadata
 from . import utility
@@ -50,11 +51,7 @@ class Raw2Ard:
 
         # update arguments
         self.getArguments( args )
-        tmp_path = os.path.join( out_path, 'tmp' )
-        
-        if os.path.isdir( tmp_path ):
-            shutil.rmtree( tmp_path )
-
+        tmp_path = out_path
         # extract scene zip 
 #         print ( 'Extracting dataset: {}'.format( scene ) )
         dataset_files = utility.unpackFiles( scene, '(.*?)', tmp_path )
