@@ -1,6 +1,6 @@
 
 import json
-from workflows.utils.prepS1AM import prepareS1AM
+from workflows.utils.prepS1AM import prepare_S1AM
 
 import redis
 import os
@@ -35,7 +35,7 @@ if __name__ == "__main__":
                 logger.info(f"Working on {itemstr}")
                 start = datetime.datetime.now().replace(microsecond=0)
                 loaded_json = json.loads(itemstr)
-                prepareS1AM(**loaded_json)
+                prepare_S1AM(**loaded_json)
                 end = datetime.datetime.now().replace(microsecond=0)
                 logger.info(f"Total processing time {end - start}")
             else:
