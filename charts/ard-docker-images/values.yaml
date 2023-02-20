@@ -1,0 +1,15 @@
+numWorkersReplicas: 10
+
+image:
+  repository: ivicamaticsd/catapult-ard-docker-images
+  tag: latest
+  pullPolicy: Always
+
+copernicus:
+    username: ""
+    password: ""
+
+s3proxy:
+    jcloudsIdentity: ""
+    jcloudsEndpoint: ""
+    jcloudsCredential: ""

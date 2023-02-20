@@ -1,0 +1,7 @@
+type: application
+apiVersion: v2
+
+name: ard-docker-images
+description: A Helm chart for deploying the ARD Docker Images
+
+version: 1.0.0
