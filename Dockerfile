@@ -25,7 +25,9 @@ RUN pip install --no-cache-dir \
     google-api-python-client \
     google-cloud-storage \
     sentinelsat \
-    xmltodict 
+    xmltodict \
+    beautifulsoup4 \
+    pyproj
 
 RUN wget http://step.esa.int/thirdparties/sen2cor/2.8.0/Sen2Cor-02.08.00-Linux64.run
 RUN chmod +x Sen2Cor-02.08.00-Linux64.run
