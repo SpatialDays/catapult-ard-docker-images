@@ -1,178 +1,27 @@
-import math
-import zipfile
-from subprocess import Popen, PIPE, STDOUT
 from dateutil.parser import parse
 import glob
-import numpy
-import pandas as pd
-from requests import HTTPError
-from http.cookiejar import MozillaCookieJar
-from urllib.request import Request, HTTPHandler, HTTPSHandler, HTTPCookieProcessor, build_opener
-from urllib.error import HTTPError
 import uuid
 from sentinelsat import SentinelAPI
-from time import sleep
+from zipfile import ZipFile
+from pyproj import CRS
+
+# TODO ADD TO REQUIREMENTS
+from bs4 import BeautifulSoup
 from workflows.utils.prep_utils import *
 
 from workflows.utils.s1am.raw2ard import Raw2Ard
 
-cookie_jar_path = os.path.join( os.path.expanduser('~'), ".bulk_download_cookiejar.txt")
-cookie_jar = MozillaCookieJar()
 
-
-def get_asf_cookie(user, password):
-
-    logging.info("logging into asf")
-
-    login_url = "https://urs.earthdata.nasa.gov/oauth/authorize"
-    client_id = "BO_n7nTIlMljdvU6kRRB3g"
-    redirect_url = "https://auth.asf.alaska.edu/login"
-
-    user_pass = base64.b64encode(bytes(user + ":" + password, "utf-8"))
-    user_pass = user_pass.decode("utf-8")
-
-    auth_cookie_url = f"{login_url}?client_id={client_id}&redirect_uri={redirect_url}&response_type=code&state="
-    context = {}
-    opener = build_opener(HTTPCookieProcessor(cookie_jar), HTTPHandler(), HTTPSHandler(**context))
-    request = Request(auth_cookie_url, headers={"Authorization": "Basic {0}".format(user_pass)})
-
-    try:
-        response = opener.open(request)
-    except HTTPError as e:
-        if e.code == 401:
-            logging.error("invalid username and password")
-            return False
-        else:
-            # If an error happens here, the user most likely has not confirmed EULA.
-            logging.error(f"Could not log in. {e.code} {e.response}")
-            return False
-
-    if check_cookie_is_logged_in(cookie_jar):
-        # COOKIE SUCCESS!
-        cookie_jar.save(cookie_jar_path)
-        logging.info("successfully logged into asf")
-        return True
-
-    logging.info("failed logging into asf")
-    return False
-
-
-def check_cookie_is_logged_in(cj):
-    for cookie in cj:
-        if cookie.name == 'urs_user_already_logged':
-            # Only get this cookie if we logged in successfully!
-            return True
-
-    return False
-
-
-def get_s1_asf_urls(s1_name_list):
-    df = pd.DataFrame()
-
-    num_parts = math.ceil(len(s1_name_list) / 119)
-    s1_name_lists = numpy.array_split(numpy.array(s1_name_list), num_parts)
-    logging.debug([len(l) for l in s1_name_lists])
-
-    for l in s1_name_lists:
-        try:
-            df = df.append(
-                pd.read_csv(
-                    f"https://api.daac.asf.alaska.edu/services/search/param?granule_list={','.join(l)}&output=csv"
-                ),
-                ignore_index=True
-            )
-        except Exception as e:
-            logging.error(e)
-
-    return df.loc[df['Processing Level'] == 'GRD_HD']
-
-
-def get_s1_asf_url(s1_name, retry=3):
-    """
-    Finds Alaska Satellite Facility download url for single S1_NAME Sentinel-1 scene. 
-
-    :param s1_name: Scene ID for Sentinel Tile (i.e. "S1A_IW_SLC__1SDV_20190411T063207_20190411T063242_026738_0300B4_6882")
-    :param retry: number of times to retry
-    :return s1url:download url
-    :return False: unable to find url
-    """
-    logging.info(f"fetching: https://api.daac.asf.alaska.edu/services/search/param?granule_list={s1_name}&output=csv")
-    try:
-        return pd \
-            .read_csv(f"https://api.daac.asf.alaska.edu/services/search/param?granule_list={s1_name}&output=csv") \
-            .URL \
-            .values[0]
-    except HTTPError as e:
-        logging.debug(f"could not query: {e}", )
-        if e.code == 503 and retry > 0:
-            logging.info("retrying...")
-            return get_s1_asf_url(s1_name, retry - 1)
-        return 'NaN'
-    except Exception as e:
-        logging.debug(f"could not query: {e}")
-        return 'NaN'
-
-
-def get_asf_file(url, output_path, chunk_size=16*1024):  # 8 kb default
-    context = {}
-    opener = build_opener(HTTPCookieProcessor(cookie_jar), HTTPHandler(), HTTPSHandler(**context))
-    request = Request(url)
-    response = opener.open(request)
-
-    with open(output_path, "wb") as f:
-        while True:
-            chunk = response.read(chunk_size)
-            if not chunk:
-                break
-            f.write(chunk)
-
-
-def download_extract_s1_scene_asf(s1_name, download_dir):
-    """
-    Downloads single S1_NAME Sentinel-1 scene into DOWLOAD_DIR. 
-
-    :param s1_name: Scene ID for Sentinel Tile (i.e. "S1A_IW_SLC__1SDV_20190411T063207_20190411T063242_026738_0300B4_6882")
-    :param download_dir: path to directory for downloaded S1 granule
-    :return:
-    """
-
-    if s1_name.endswith('.SAFE'):
-        s1_name = s1_name[:-5]
-
-    # Grab url for scene
-    s1url = get_s1_asf_url(s1_name)
-    if s1url == 'NaN':
-        logging.error(f"did not get a valid url. Aborting download of {s1_name}")
-        return
-
-    asf_user = os.getenv("ASF_USERNAME")
-    asf_pwd = os.getenv("ASF_PWD")
-
-    # Extract downloaded .zip file
-    zipped = os.path.join(download_dir, s1_name + '.zip')
-    safe_dir = os.path.join(download_dir, s1_name + '.SAFE/')
-
-    if not check_cookie_is_logged_in(cookie_jar):
-        get_asf_cookie(asf_user, asf_pwd)
-
-    if not os.path.exists(zipped) & (not os.path.exists(safe_dir)):
-        get_asf_file(s1url, zipped)
-
-#     if not os.path.exists(safe_dir):
-#         logging.info('Extracting ASF scene: {}'.format(zipped))
-#         zip_ref = zipfile.ZipFile(zipped, 'r')
-#         zip_ref.extractall(os.path.dirname(download_dir))
-#         zip_ref.close()
-
+root = setup_logging()
 
 def find_s1_uuid(s1_filename):
     """
-    Returns S2 uuid required for download via sentinelsat, based upon an input S2 file/scene name. 
-    I.e. S2A_MSIL1C_20180820T223011_N0206_R072_T60KWE_20180821T013410
+    Returns S1 uuid required for download via sentinelsat, based upon an input S1 file/scene name. 
+    I.e. S1A_MSIL1C_20180820T223011_N0206_R072_T60KWE_20180821T013410
     Assumes esa hub creds stored as env variables.
     
-    :param s2_file_name: Sentinel-2 scene name
-    :return s2_uuid: download id
+    :param S1_file_name: Sentinel-2 scene name
+    :return S1_uuid: download id
     """
     copernicus_username = os.getenv("COPERNICUS_USERNAME")
     copernicus_pwd = os.getenv("COPERNICUS_PWD")
@@ -184,14 +33,15 @@ def find_s1_uuid(s1_filename):
         res = esa_api.to_geodataframe(res)
 
         return res.uuid.values[0]
-        
+
+
 def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
     """
-    Download a single S2 scene from ESA via sentinelsat 
+    Download a single S1 scene from ESA via sentinelsat 
     based upon uuid. 
     Assumes esa hub creds stored as env variables.
     
-    :param scene_uuid: S2 download uuid from sentinelsat query
+    :param scene_uuid: S1 download uuid from sentinelsat query
     :param down_dir: directory in which to create a downloaded product dir
     :param original_scene_dir: 
     :return: 
@@ -200,33 +50,22 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
     if not os.path.exists(original_scene_dir):
 
         # if downloaded .zip file doesn't exist then download it
-        if not os.path.exists(original_scene_dir.replace('.SAFE/', '.zip')):
+        zip_file_path = original_scene_dir.replace('.SAFE/', '.zip')
+        if not os.path.exists(zip_file_path):
             logging.info('Downloading ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
 
             copernicus_username = os.getenv("COPERNICUS_USERNAME")
             copernicus_pwd = os.getenv("COPERNICUS_PWD")
             logging.debug(f"ESA username: {copernicus_username}")
-            esa_api = SentinelAPI(copernicus_username, copernicus_pwd)
-            logging.info(f"Scene uuid is: {scene_uuid}")
-            esa_api.download(scene_uuid, down_dir, checksum=True)
-            # extract downloaded .zip file
-            # logging.info('Extracting ESA scene: {}'.format(original_scene_dir))
-            # zip_ref = zipfile.ZipFile(original_scene_dir.replace('.SAFE/', '.zip'), 'r')
-            # zip_ref.extractall(os.path.dirname(down_dir))
-            # zip_ref.close()
 
-            # log out the folder where the scene is
-            logging.info('ESA scene downloaded to: {}'.format(original_scene_dir))
+            try:
+                esa_api = SentinelAPI(copernicus_username, copernicus_pwd)
+                esa_api.download(scene_uuid, down_dir, checksum=True)
+            except Exception as e:
+                raise DownloadError(f"Error downloading {scene_uuid} from ESA hub: {e}")
 
     else:
         logging.warning('ESA scene already extracted: {}'.format(original_scene_dir))
-
-    # remove zipped scene but onliy if unzipped 
-    if os.path.exists(original_scene_dir) & os.path.exists(original_scene_dir.replace('.SAFE/', '.zip')):
-        logging.info('Deleting ESA scene zip: {}'.format(original_scene_dir.replace('.SAFE/', '.zip')))
-        os.remove(original_scene_dir.replace('.SAFE/', '.zip'))
-
-
 def band_name_s1(prod_path):
     """
     Determine polarisation of individual product from product name
@@ -235,10 +74,11 @@ def band_name_s1(prod_path):
 
     prod_name = str(prod_path.split('/')[-1])
 
-    if 'Gamma0_VH' in str(prod_name):
+    if '-vh-' in str(prod_name):
         return 'vh'
-    if 'Gamma0_VV' in str(prod_name):
+    elif '-vv-' in str(prod_name):
         return 'vv'
+    # TODO: Work needed to find new name 
     if 'LayoverShadow_MASK' in str(prod_name):
         return 'layovershadow_mask'
 
@@ -260,17 +100,10 @@ def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, overwrite=Fal
         logging.warning('Creating scene cog directory: {}'.format(cog_scene_dir))
         os.mkdir(cog_scene_dir)
 
-    des_prods = ["Gamma0_VV_db",
-                 "Gamma0_VH_db",
-                 "LayoverShadow_MASK_VH"]  # to ammend once outputs finalised - TO DO*****
+    prod_paths = discover_tiffs(noncog_scene_dir)
 
-    # find all individual prods to convert to cog (ignore true colour images (TCI))
-    prod_paths = glob.glob(noncog_scene_dir + '*TF_TC*/*.tif')  # - TO DO*****
-    prod_paths = [x for x in prod_paths if os.path.basename(x)[:-4] in des_prods]
-#     print(noncog_scene_dir)
-#     print(glob.glob(noncog_scene_dir + '/*TF_TC*/'))
-#     print(prod_paths)
-    
+    logging.info(f"found {len(prod_paths)} products to convert to cog from {noncog_scene_dir}")
+
     # iterate over prods to create parellel processing list
     for prod in prod_paths:
         out_filename = os.path.join(cog_scene_dir, scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
@@ -279,59 +112,108 @@ def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, overwrite=Fal
         to_cog(prod, out_filename, nodata=-9999)
 
 
-def copy_s1_metadata(out_s1_prod, cog_scene_dir, scene_name):
-    """
-    Parse through S2 metadtaa .xml for either l1c or l2a S2 scenes.
-    """
-
-    if os.path.exists(out_s1_prod):
-
-        meta_base = os.path.basename(out_s1_prod)
-        n_meta = os.path.join(cog_scene_dir + '/' + scene_name + '_' + meta_base)
-        logging.info("Copying original metadata file to cog dir: {}".format(n_meta))
-        if not os.path.exists(n_meta):
-            shutil.copyfile(out_s1_prod, n_meta)
-        else:
-            logging.info("Original metadata file already copied to cog_dir: {}".format(n_meta))
-    else:
-        logging.warning("Cannot find orignial metadata file: {}".format(out_s1_prod))
+def read_manifest(path: str):
+    manifest_path: str = os.path.join(path, 'manifest.safe')
+    try:
+        with open(manifest_path, 'r') as f:
+            manifest: str = f.read()
+    except FileNotFoundError as e:
+        print(f"Manifest file {manifest_path} not found.")
+        raise e
+    return manifest
 
 
-def yaml_prep_s1(scene_dir):
+def extract_wkt_and_coordinates(manifest):
+    soup = BeautifulSoup(manifest, 'xml')
+
+    crs_name = soup.find('safe:footPrint')['srsName']
+    coordinates_str = soup.find('gml:coordinates').text
+    epsg_code = crs_name.split('#')[-1]
+    spatial_ref = CRS.from_epsg(int(epsg_code))
+    wkt = spatial_ref.to_wkt()
+
+    coordinates = [tuple(map(float, coord.split(','))) for coord in coordinates_str.split()]
+    return wkt, coordinates
+
+
+def get_s1_geometry(path):
+    manifest = read_manifest(path)
+    wkt, coordinates = extract_wkt_and_coordinates(manifest)
+
+    top = coordinates[2][0]
+    left = coordinates[1][1]
+    right = coordinates[3][1]
+    bottom = coordinates[0][0]
+
+    projection = {
+        'geo_ref_points': {
+            'ul': {
+                'x': left,
+                'y': top
+            },
+            'ur': {
+                'x': right,
+                'y': top
+            },
+            'll': {
+                'x': left,
+                'y': bottom
+            },
+            'lr': {
+                'x': right,
+                'y': bottom
+            }
+        },
+        'spatial_reference': wkt
+    }
+
+    extent = {
+        'll' : {
+            'lat': bottom,
+            'lon': left
+        },
+        'lr' : {
+            'lat' : bottom,
+            'lon' : right
+        },
+        'ul' : {
+            'lat' : top,
+            'lon' : left
+        },
+        'ur' : {
+            'lat' : top,
+            'lon' : right
+        }
+    }
+    return projection, extent
+
+
+def yaml_prep_s1(scene_dir, down_dir):
     """
     Prepare individual S1 scene directory containing S1 products
     note: doesn't inc. additional ancillary products such as incidence
     angle or layover/foreshortening masks
     """
     scene_name = scene_dir.split('/')[-2]
-    logging.info("Preparing scene {}".format(scene_name))
-    logging.info("Scene path {}".format(scene_dir))
-    # log the scene_dir
-    logging.info(f"scene_dir: {scene_dir}")
-    prod_paths = glob.glob(os.path.join(scene_dir, '*.tif'))
-    # also add .tiff files
-    prod_paths.extend(glob.glob(os.path.join(scene_dir, '*.tiff')))
 
-    logging.info(f"prod_path: {prod_paths}, scene_name: {scene_name}")
+    logging.info("Scene path {}".format(scene_dir)) # /tmp/data/intermediate/S1A_IW_GRDH_1SDV_20230118T174108_tmp
+
+    prod_paths = discover_tiffs(scene_dir)
+    logging.debug(f"Found {len(prod_paths)} products")
+
     t0 = parse(str(datetime.strptime(scene_name.split("_")[-2], '%Y%m%dT%H%M%S')))
-
-    logging.info(f"Product paths are: {prod_paths}")
 
     # get polorisation from each image product (S1 band)
     # should be replaced with a more concise, generalisable parsing
     images = {
         band_name_s1(prod_path): {
-            'path': os.path.split(prod_path)[-1]
+            'path': prod_path
         } for prod_path in prod_paths
     }
-    logging.debug(images)
 
-    # trusting bands coaligned, use one to generate spatial bounds for all
-    try:
-        projection, extent = get_geometry(os.path.join(str(scene_dir), images['vh']['path']))
-    except:
-        projection, extent = get_geometry(os.path.join(str(scene_dir), images['vv']['path']))
-        logging.warning('no vh band available')
+    # read from manifest
+    projection, extent = get_s1_geometry(down_dir)
+
 
     # format metadata (i.e. construct hashtable tree for syntax of file interface)
     return {
@@ -358,162 +240,98 @@ def yaml_prep_s1(scene_dir):
         'lineage': {
             'source_datasets': {},
         }
-
     }
 
 
-def prepareS1AM(title, chunks=24, ext_dem=True, s3_bucket='', s3_dir='common_sensing/sentinel_1/', inter_dir='/tmp/data/intermediate/',
-                source='asf', **kwargs):
+def prepare_S1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_sensing/sentinel_1/', inter_dir='/tmp/data/intermediate/', **kwargs):
     in_scene = title
     """
-    Prepare IN_SCENE of Sentinel-1 satellite data into OUT_DIR for ODC indexing. 
+    Prepare a Sentinel-1 scene (L1C or L2A) for indexing in ODC by converting it to COGs.
 
-    :param in_scene: input Sentinel-1 scene name (either L1C or L2A) i.e. "S2A_MSIL1C_20180820T223011_N0206_R072_T60KWE_20180821T013410.SAFE"
-    :param out_dir: output directory to drop COGs into.
-    :param --inter: optional intermediary directory to be used for processing.
-    :param --source: Api source to be used for downloading scenes. Defaults to gcloud. Options inc. 'gcloud', 'esahub', 'sedas' COMING SOON
+    :param in_scene: the name of the input Sentinel-1 scene, e.g. "S1A_IW_GRDH_1SDV_20211004T165352_20211004T165417_039025_049FA6_E5F6"
+    :param chunks: the number of chunks to use when creating COGs (default is 24)
+    :param s3_bucket: the S3 bucket where the scene is located (default is 'public-eo-data')
+    :param s3_dir: the directory path within the S3 bucket where the scene is located (default is 'common_sensing/sentinel_1/')
+    :param inter_dir: an optional intermediate directory to be used for processing (default is '/tmp/data/intermediate/')
     :return: None
-    
-    Assumptions:
-    - etc.... tbd
     """
 
-    # Need to handle inputs with and without .SAFE extension
-    if not in_scene.endswith('.SAFE'):
-        in_scene = in_scene + '.SAFE'
-    # shorten scene name
-    scene_name = in_scene[:32]
+    tmp_inter_dir = inter_dir
 
-    # Unique inter_dir needed for clean-up
-    inter_dir = inter_dir + scene_name + '_tmp/'
-    # sub-dirs used only for accessing tmp files
+    if not in_scene.endswith('.SAFE'):
+        in_scene += '.SAFE'
+
+    scene_name = in_scene[:32]
+    inter_dir = f'{inter_dir}{scene_name}_tmp/'
+
     cog_dir = os.path.join(inter_dir, scene_name)
     os.makedirs(cog_dir, exist_ok=True)
-    # s1-specific relative inputs
-#     input_mani = inter_dir + in_scene + '/manifest.safe'
-#     inter_prod1 = inter_dir + scene_name + '_Orb_Cal_Deb_ML.dim'
-#     inter_prod1_dir = inter_prod1[:-4] + '.data/'
-#     inter_prod2 = inter_dir + scene_name + '_Orb_Cal_Deb_ML_TF.dim'
-#     inter_prod2_dir = inter_prod2[:-4] + '.data/'
-#     out_prod1 = inter_dir + scene_name + '_Orb_Cal_Deb_ML_TF_TC_dB.dim'
-#     out_dir1 = out_prod1[:-4] + '.data/'
-#     out_prod2 = inter_dir + scene_name + '_Orb_Cal_Deb_ML_TF_TC_lsm.dim'
-#     out_dir2 = out_prod2[:-4] + '.data/'
-    down_dir = inter_dir + in_scene + '/'
-    
-#     snap_gpt = os.environ['SNAP_GPT']
-#     int_graph_1 = os.environ['S1_PROCESS_P1A']  # ENV VAR
-# #     if ext_dem:
-# #         ext_dem_path = inter_dir + 'ext_dem.tif'
-#     int_graph_2 = os.environ['S1_PROCESS_P2A']  # ENV VAR
-#     int_graph_3 = os.environ['S1_PROCESS_P3A']  # ENV VAR
-#     int_graph_4 = os.environ['S1_PROCESS_P4A']  # ENV VAR
-
 
     down_zip = inter_dir + in_scene.replace('.SAFE','.zip')
-    am_dir = down_zip.replace('.zip', 'Orb_Cal_Deb_ML_TF_TC_dB/')
-    
-    root = setup_logging()
-    root.info('{} {} Starting'.format(in_scene, scene_name))
+    down_dir = inter_dir + in_scene + '/'
 
+    root.info(f'download dir: {down_dir}')
     try:
-        #  DOWNLOAD
+        # Download scene from ESA
         try:
-            root.info(f"{in_scene} {scene_name} DOWNLOADING via ASF")
-            download_extract_s1_scene_asf(in_scene, inter_dir)
-            # raise Exception('skipping asf for testing')
-            root.info(f"{in_scene} {scene_name} DOWNLOADED via ASF")
+            s1id = find_s1_uuid(in_scene)
+            logging.debug(s1id)
+            root.info(f"{in_scene} {scene_name}: Available for download from ESA")
+            download_extract_s1_esa(s1id, inter_dir, down_dir)
+            root.info(f"{in_scene} {scene_name}: Downloaded from ESA")
         except Exception as e:
-            root.exception(e)
-            root.exception(f"{in_scene} {scene_name} UNAVAILABLE via ASF, try ESA")
-            try:
-                s1id = find_s1_uuid(in_scene)
-                logging.debug(s1id)
-                root.info(f"{in_scene} {scene_name} AVAILABLE via ESA")
-                download_extract_s1_esa(s1id, inter_dir, down_dir)
-                root.info(f"{in_scene} {scene_name} DOWNLOADED via ESA")
-            except Exception as e:
-                root.exception(f"{in_scene} {scene_name} UNAVAILABLE via ESA too")
-                raise Exception('Download Error ESA', e)
+            root.exception(f"{in_scene} {scene_name}: Failed to download from ESA")
+            raise DownloadError(f"Failed to download {in_scene} from ESA") from e
 
-        try:
-            root.info(f"{in_scene} {scene_name} DOWNLOADING External DEMs")
-            # Download external DEMs
-            ext_dem_path_E = "common_sensing/ancillary_products/SRTM1Sec/SRTM30_Fiji_E.tif"
-            ext_dem_path_W = "common_sensing/ancillary_products/SRTM1Sec/SRTM30_Fiji_W.tif"
 
-            ext_dem_E = f'/app/dem/SRTM30_Fiji_E.tif'
-            ext_dem_W = f'/app/dem/SRTM30_Fiji_W.tif'
-            if not os.path.exists(ext_dem_E):
-                logging.info(f"Downloading DEM")
-                s3_download(s3_bucket, ext_dem_path_E, ext_dem_E)
-                s3_download(s3_bucket, ext_dem_path_W, ext_dem_W)
-                logging.info(f"DEM downloaded")
-            else:
-                logging.info(f"DEM already downloaded")
-            root.info(f"{in_scene} {scene_name} DOWNLOADED E+W DEMs")
-        except Exception as e:
-            root.exception(e)
-            root.exception(f"{ext_dem_path_E} or {ext_dem_path_W} UNAVAILABLE")
-        
+        # Download external DEMs
+        ext_dem_path_list = download_external_dems(in_scene, scene_name, tmp_inter_dir, s3_bucket, root)
+
+        # Process AM
         try:
-            root.info(f"{in_scene} {scene_name} Starting AM SNAP processing")        
-            # Do AM Processing
+            root.info(f"{in_scene} {scene_name} Starting AM SNAP processing")
             obj = Raw2Ard( chunks=chunks, gpt='/opt/snap/bin/gpt' )
-            obj.process(down_zip, am_dir, ext_dem_E, ext_dem_W)
+            obj.process(down_zip, inter_dir, ext_dem_path_list[0], ext_dem_path_list[1])
         except Exception as e:
             root.exception(e)
-            root.exception(f"Processing failed")
-        
 
-        # CONVERT TO COGS TO TEMP COG DIRECTORY**
+        # Convert scene to COGs in a temporary directory
         try:
-            root.info(f"{in_scene} {scene_name} Converting COGs")
-            conv_s1scene_cogs(inter_dir, cog_dir, scene_name)
-            root.info(f"{in_scene} {scene_name} COGGED")
+            root.info(f"Converting {in_scene} to COGs")
+            conv_s1scene_cogs(down_dir, cog_dir, scene_name)
+            root.info(f"Finished converting {in_scene} to COGs")
         except Exception as e:
-            root.exception(f"{in_scene} {scene_name} COG conversion FAILED")
-            raise Exception('COG Error', e)
+            root.exception(f"Failed to convert {in_scene} to COGs")
+            raise Exception(f"COG conversion error: {e}")
 
-#             # PARSE METADATA TO TEMP COG DIRECTORY**
-#         try:
-#             root.info(f"{in_scene} {scene_name} Copying original METADATA")
-#             copy_s1_metadata(out_prod1, cog_dir, scene_name)
-#             copy_s1_metadata(out_prod2, cog_dir, scene_name)
-#             root.info(f"{in_scene} {scene_name} COPIED original METADATA")
-#         except Exception as e:
-#             root.exception(f"{in_scene} {scene_name} MTD not coppied")
-#             raise e
 
-        # GENERATE YAML WITHIN TEMP COG DIRECTORY**
+        # Create YAML metadata for the COGs
         try:
-            root.info(f"{in_scene} {scene_name} Creating dataset YAML")
-            create_yaml(cog_dir, yaml_prep_s1(cog_dir))
-            root.info(f"{in_scene} {scene_name} Created original METADATA")
+            root.info(f"Creating dataset YAML for {in_scene}")
+            metadata = yaml_prep_s1(cog_dir, down_dir)
+            create_yaml(cog_dir, metadata)
+            root.info(f"Finished creating dataset YAML for {in_scene}")
         except Exception as e:
-            root.exception(f"{in_scene} {scene_name} Dataset YAML not created")
-            raise Exception('YAML creation error', e)
+            root.exception(f"Failed to create dataset YAML for {in_scene}")
+            raise Exception(f"YAML creation error: {e}")
 
-            # MOVE COG DIRECTORY TO OUTPUT DIRECTORY
+
+        # Upload COGs to S3 bucket
         try:
-            root.info(f"{in_scene} {scene_name} Uploading to S3 Bucket")
-            s3_upload_cogs(glob.glob(os.path.join(cog_dir, '*')), s3_bucket, s3_dir)
-            root.info(f"{in_scene} {scene_name} Uploaded to S3 Bucket")
+            root.info(f"Uploading {in_scene} COGs to S3 bucket")
+            cogs_to_upload = glob.glob(os.path.join(cog_dir, '*'))
+            s3_upload_cogs(cogs_to_upload, s3_bucket, s3_dir)
+            root.info(f"Finished uploading {in_scene} COGs to S3 bucket")
         except Exception as e:
-            root.exception(f"{in_scene} {scene_name} Upload to S3 Failed")
-            raise Exception('S3  upload error', e)
-        print('not boo')
-
-        # DELETE ANYTHING WITHIN THE TEMP DIRECTORY
-        clean_up(inter_dir)
+            root.exception(f"Failed to upload {in_scene} COGs to S3 bucket")
+            raise Exception(f"S3 upload error: {e}")
 
     except Exception as e:
         logging.error(f"could not process {scene_name} {e}")
-        print('boo')
-        sleep(3600)
+    finally:
+        logging.info(f"cleaning up {inter_dir}")
         clean_up(inter_dir)
 
 
 if __name__ == '__main__':
-    prepareS1AM('S1A_IW_GRDH_1SDV_20191001T064008_20191001T064044_029261_035324_C74C',
-              s3_dir='fiji/Sentinel_1_dockertest/', inter_dir='../S1_ARD/')
+    prepare_S1AM('S1A_IW_GRDH_1SDV_20230118T174108_20230118T174131_046841_059DD6_8B3D')
