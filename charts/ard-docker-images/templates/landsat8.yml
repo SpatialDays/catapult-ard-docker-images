@@ -42,6 +42,6 @@ spec:
           - name: AWS_DEFAULT_REGION
             value: "eu-west-2"
           - name: REDIS_HOST
-            value: "redis"
+            value: {{ .Values.redis.host | quote }}
           - name: REDIS_PORT
-            value: "6379"
+            value: {{ .Values.redis.port | quote }}

@@ -13,3 +13,7 @@ s3proxy:
     jcloudsIdentity: ""
     jcloudsEndpoint: ""
     jcloudsCredential: ""
+
+redis:
+    host: "ha-redis-master"
+    port: 6379
