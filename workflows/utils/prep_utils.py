@@ -271,16 +271,14 @@ def split_all(path):
 
 
 def get_geometry(path):
-    # TODO: GET FROM MANIFEST.SAFE
-    top = '-17.367270'
-    left = '176.245819'
-    right = '178.909500'
-    bottom = '-19.284351'
-
-    crs = 'EPSG:4326'
-
-    projection = {
-        'geo_ref_points': {
+    """
+    function stolen and unammended
+    """
+    logging.debug(f"in get geometry {path}")
+    with rasterio.open(path) as img:
+        left, bottom, right, top = img.bounds
+        crs = str(str(getattr(img, 'crs_wkt', None) or img.crs.wkt))
+        corners = {
             'ul': {
                 'x': left,
                 'y': top
@@ -297,30 +295,21 @@ def get_geometry(path):
                 'x': right,
                 'y': bottom
             }
-        },
-        'spatial_reference': 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433],AUTHORITY["EPSG","4326"]]'
-    }
-
-    extent = {
-        'll' : {
-            'lat': bottom,
-            'lon': left
-        },
-        'lr' : {
-            'lat' : bottom,
-            'lon' : right
-        },
-        'ul' : {
-            'lat' : top,
-            'lon' : left
-        },
-        'ur' : {
-            'lat' : top,
-            'lon' : right
         }
-    }
+        projection = {'spatial_reference': crs, 'geo_ref_points': corners}
 
-    return projection, extent
+        spatial_ref = osr.SpatialReference(crs)
+        t = osr.CoordinateTransformation(spatial_ref, spatial_ref.CloneGeogCS())
+
+        def transform(p):
+            # GDAL 3 swapped the parameters around here. 
+            # https://github.com/OSGeo/gdal/issues/1546
+            lon, lat, z = t.TransformPoint(p['x'], p['y'])
+            return {'lon': lon, 'lat': lat}
+
+        extent = {key: transform(p) for key, p in corners.items()}
+
+        return projection, extent
 
 
 def create_metadata_extent(extent, t0, t1):
