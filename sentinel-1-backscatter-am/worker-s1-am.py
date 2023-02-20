@@ -1,6 +1,6 @@
 
 import json
-from workflows.utils.prepS1AM import prepareS1AM
+from workflows.utils.prepS1AM import prepare_S1AM
 
 import redis
 import os
@@ -25,7 +25,7 @@ if __name__ == "__main__":
                             level=level)
         host = os.getenv("REDIS_HOST", "localhost")
         port = int(os.getenv("REDIS_PORT", "6379"))
-        redis_queue = os.getenv("REDIS_S2_PROCESSED_CHANNEL", "jobS1")
+        redis_queue = "jobS1"
         redis = redis.Redis(host=host, port=port)
 
         while True:
@@ -35,14 +35,12 @@ if __name__ == "__main__":
                 logger.info(f"Working on {itemstr}")
                 start = datetime.datetime.now().replace(microsecond=0)
                 loaded_json = json.loads(itemstr)
-                prepareS1AM(**loaded_json)
+                prepare_S1AM(**loaded_json)
                 end = datetime.datetime.now().replace(microsecond=0)
                 logger.info(f"Total processing time {end - start}")
             else:
                 logger.info("No work found in queue")
-                break
-        logger.info("Queue empty, exiting")
-        exit(0)
+
 
     except Exception as e:
         logger.exception(e)
