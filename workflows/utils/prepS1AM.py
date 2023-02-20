@@ -3,7 +3,7 @@ import glob
 import uuid
 from sentinelsat import SentinelAPI
 from zipfile import ZipFile
-import xml.etree.ElementTree as ET
+from pyproj import CRS
 
 # TODO ADD TO REQUIREMENTS
 from bs4 import BeautifulSoup
@@ -135,26 +135,27 @@ def read_manifest(path: str):
     return manifest
 
 
-def extract_crs_and_coordinates(manifest):
+def extract_wkt_and_coordinates(manifest):
     soup = BeautifulSoup(manifest, 'xml')
 
     crs_name = soup.find('safe:footPrint')['srsName']
     coordinates_str = soup.find('gml:coordinates').text
     epsg_code = crs_name.split('#')[-1]
-    epsg_str = f'EPSG:{epsg_code}'
+    spatial_ref = CRS.from_epsg(int(epsg_code))
+    wkt = spatial_ref.to_wkt()
 
     coordinates = [tuple(map(float, coord.split(','))) for coord in coordinates_str.split()]
-    return epsg_str, coordinates
+    return wkt, coordinates
 
 
 def get_s1_geometry(path):
     manifest = read_manifest(path)
-    crs, coordinates = extract_crs_and_coordinates(manifest)
+    wkt, coordinates = extract_wkt_and_coordinates(manifest)
 
-    top = coordinates[2][0] # -17.36727
-    left = coordinates[1][1] # 176.245819
-    right = coordinates[3][1] # 178.9095
-    bottom = coordinates[0][0] # -19.284351
+    top = coordinates[2][0]
+    left = coordinates[1][1]
+    right = coordinates[3][1]
+    bottom = coordinates[0][0]
 
     projection = {
         'geo_ref_points': {
@@ -175,7 +176,7 @@ def get_s1_geometry(path):
                 'y': bottom
             }
         },
-        'spatial_reference': 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433],AUTHORITY["EPSG","4326"]]'
+        'spatial_reference': wkt
     }
 
     extent = {
