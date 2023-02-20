@@ -64,20 +64,8 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
             except Exception as e:
                 raise DownloadError(f"Error downloading {scene_uuid} from ESA hub: {e}")
 
-            # Seemingly we don't need this
-            # logging.info('Unzipping ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
-            # with ZipFile(zip_file_path, 'r') as zip_file:
-            #     zip_file.extractall(os.path.dirname(down_dir))
-
     else:
         logging.warning('ESA scene already extracted: {}'.format(original_scene_dir))
-
-    # # remove zipped scene but onliy if unzipped 
-    # if os.path.exists(original_scene_dir) & os.path.exists(original_scene_dir.replace('.SAFE/', '.zip')):
-    #     logging.info('Deleting ESA scene zip: {}'.format(original_scene_dir.replace('.SAFE/', '.zip')))
-    #     os.remove(original_scene_dir.replace('.SAFE/', '.zip'))
-
-
 def band_name_s1(prod_path):
     """
     Determine polarisation of individual product from product name
@@ -208,9 +196,6 @@ def yaml_prep_s1(scene_dir, down_dir):
     """
     scene_name = scene_dir.split('/')[-2]
 
-    # Get rid of the last part of the path
-    scene_dir = scene_dir.split('/')[0:-1]
-    scene_dir = '/'.join(scene_dir)
     logging.info("Scene path {}".format(scene_dir)) # /tmp/data/intermediate/S1A_IW_GRDH_1SDV_20230118T174108_tmp
 
     prod_paths = discover_tiffs(scene_dir)
@@ -283,18 +268,16 @@ def prepare_S1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_se
     os.makedirs(cog_dir, exist_ok=True)
 
     down_zip = inter_dir + in_scene.replace('.SAFE','.zip')
-    am_dir = down_zip.replace('.zip', 'Orb_Cal_Deb_ML_TF_TC_dB/')
     down_dir = inter_dir + in_scene + '/'
 
     root.info(f'download dir: {down_dir}')
     try:
-
         # Download scene from ESA
         try:
             s1id = find_s1_uuid(in_scene)
             logging.debug(s1id)
             root.info(f"{in_scene} {scene_name}: Available for download from ESA")
-            # download_extract_s1_esa(s1id, inter_dir, down_dir)
+            download_extract_s1_esa(s1id, inter_dir, down_dir)
             root.info(f"{in_scene} {scene_name}: Downloaded from ESA")
         except Exception as e:
             root.exception(f"{in_scene} {scene_name}: Failed to download from ESA")
@@ -308,14 +291,14 @@ def prepare_S1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_se
         try:
             root.info(f"{in_scene} {scene_name} Starting AM SNAP processing")
             obj = Raw2Ard( chunks=chunks, gpt='/opt/snap/bin/gpt' )
-            obj.process(down_zip, am_dir, ext_dem_path_list[0], ext_dem_path_list[1])
+            obj.process(down_zip, inter_dir, ext_dem_path_list[0], ext_dem_path_list[1])
         except Exception as e:
             root.exception(e)
 
         # Convert scene to COGs in a temporary directory
         try:
             root.info(f"Converting {in_scene} to COGs")
-            conv_s1scene_cogs(inter_dir, cog_dir, scene_name)
+            conv_s1scene_cogs(down_dir, cog_dir, scene_name)
             root.info(f"Finished converting {in_scene} to COGs")
         except Exception as e:
             root.exception(f"Failed to convert {in_scene} to COGs")
@@ -343,13 +326,11 @@ def prepare_S1AM(title, chunks=24, s3_bucket='public-eo-data', s3_dir='common_se
             root.exception(f"Failed to upload {in_scene} COGs to S3 bucket")
             raise Exception(f"S3 upload error: {e}")
 
-
-        # Delete temporary files
-        # clean_up(inter_dir)
-
     except Exception as e:
         logging.error(f"could not process {scene_name} {e}")
-        # clean_up(inter_dir)
+    finally:
+        logging.info(f"cleaning up {inter_dir}")
+        clean_up(inter_dir)
 
 
 if __name__ == '__main__':
