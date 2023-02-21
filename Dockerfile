@@ -27,13 +27,13 @@ RUN pip install --no-cache-dir \
     sentinelsat \
     xmltodict \
     beautifulsoup4 \
-    pyproj
-
+    pyproj \
+    et_xmlfile 
+    
 RUN wget http://step.esa.int/thirdparties/sen2cor/2.8.0/Sen2Cor-02.08.00-Linux64.run
 RUN chmod +x Sen2Cor-02.08.00-Linux64.run
 RUN ./Sen2Cor-02.08.00-Linux64.run 
-
-
+RUN pip install lxml
 
 COPY . /app
 WORKDIR /app
