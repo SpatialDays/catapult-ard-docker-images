@@ -19,7 +19,7 @@ services:
       - LOGLEVEL=DEBUG
       - REDIS_HOST=
       - REDIS_PORT=
-      - REDIS_S2_PROCESSED_CHANNEL=jobS1
+      - AWS_ACCESS_KEY_ID=s3-proxy-not-needed
       - AWS_ACCESS_KEY_ID=
       - AWS_SECRET_ACCESS_KEY=
       - AWS_DEFAULT_REGION=

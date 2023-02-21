@@ -46,6 +46,6 @@ spec:
           - name: REDIS_PORT
             value: {{ .Values.redis.port | quote }}
           - name: COPERNICUS_USERNAME 
-            value: {{ .Values.copernicus.username | quote }}
+            value: {{ .Values.copernicus_s2.username | quote }}
           - name: COPERNICUS_PWD
-            value: {{ .Values.copernicus.password | quote }}
+            value: {{ .Values.copernicus_s2.password | quote }}
