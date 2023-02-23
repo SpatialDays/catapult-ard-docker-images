@@ -30,6 +30,33 @@ RUN pip install --no-cache-dir \
     pyproj \
     lxml
 
+RUN conda update conda --quiet --yes \
+    && conda clean --all -f -y \
+    && find /opt/conda/ -follow -type f -name '*.a' -delete \
+    && find /opt/conda/ -follow -type f -name '*.pyc' -delete \
+    && find /opt/conda/ -follow -type f -name '*.js.map' -delete
+
+RUN conda install --quiet --yes \
+    boto3 \
+    geopandas \
+    hdmedians \
+    matplotlib \
+    pandas \
+    pip \
+    pyyaml \
+    rasterio \
+    requests \
+    scikit-learn \
+    xarray \
+    && conda clean --all -f -y \
+    && find /opt/conda/ -follow -type f -name '*.a' -delete \
+    && find /opt/conda/ -follow -type f -name '*.pyc' -delete \
+    && find /opt/conda/ -follow -type f -name '*.js.map' -delete
+
+RUN pip install --no-cache-dir \
+    asynchronousfilereader \
+    redis 
+
 RUN wget http://step.esa.int/thirdparties/sen2cor/2.8.0/Sen2Cor-02.08.00-Linux64.run
 RUN chmod +x Sen2Cor-02.08.00-Linux64.run
 RUN ./Sen2Cor-02.08.00-Linux64.run 

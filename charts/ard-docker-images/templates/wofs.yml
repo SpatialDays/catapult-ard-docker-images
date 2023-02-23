@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ard-docker-images-sentinel2
+  name: ard-docker-images-wofs
 spec:
   replicas: {{ .Values.numWorkersReplicas }}
   selector:
     matchLabels:
-      app: ard-docker-images-sentinel2
+      app: ard-docker-images-wofs
   template:
     metadata:
       labels:
-        app: ard-docker-images-sentinel2
+        app: ard-docker-images-wofs
     spec:
       containers:
       - name: s3proxy
@@ -28,10 +28,10 @@ spec:
               value: {{ .Values.s3proxy.jcloudsEndpoint | quote }}
             - name: JCLOUDS_CREDENTIAL
               value: {{ .Values.s3proxy.jcloudsCredential | quote }}
-      - name: ard-docker-images-sentinel2
+      - name: ard-docker-images-wofs
         image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
         imagePullPolicy: {{ $.Values.image.pullPolicy }}
-        command: ["python3", "-m","sentinel-2-l2a.worker-s2"]        
+        command: ["python3", "-m","water-classification-wofs.worker-water"]     
         env:
           - name: AWS_ACCESS_KEY_ID
             value: "aws-access-key-id"
@@ -45,7 +45,3 @@ spec:
             value: {{ .Values.redis.host | quote }}
           - name: REDIS_PORT
             value: {{ .Values.redis.port | quote }}
-          - name: COPERNICUS_USERNAME 
-            value: {{ .Values.copernicus_s2.username | quote }}
-          - name: COPERNICUS_PWD
-            value: {{ .Values.copernicus_s2.password | quote }}
