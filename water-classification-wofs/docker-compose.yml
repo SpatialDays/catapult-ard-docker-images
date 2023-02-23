@@ -1,28 +1,17 @@
 version: '3'
 
 services:
-  redis-master:
-    image: redis
-    container_name: redis-master
-    ports:
-      - "6379:6379"
-    restart: always
-    command: redis-server --appendonly yes
-    volumes:
-      - ./redisdata:/data
-  
-  jupyter-worker:
+  sentinel1-am-ard:
     build:
-      context: ./
-      dockerfile: Dockerfile-devel
+      context: ../
+    network_mode: host
     environment:
       - LOGLEVEL=DEBUG
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_S3_ENDPOINT_URL=${AWS_S3_ENDPOINT_URL}
-    ports:
-      - "8855:8888"
-    volumes:
-      - ./data:/tmp/data
-      - ./workflows:/opt/notebooks
-    restart: always
+      - REDIS_HOST=localhost
+      - REDIS_PORT=30000
+      - AWS_ACCESS_KEY_ID=s3-proxy-not-needed
+      - AWS_SECRET_ACCESS_KEY=s3-proxy-not-needed
+      - AWS_DEFAULT_REGION=eu-west-2
+      - S3_ENDPOINT=http://localhost:30003
+      - S3_BUCKET=ard-bucket
+    command: ["python3", "-m","water-classification-wofs.worker-water"]
