@@ -10,7 +10,6 @@ import os
 import numpy as np
 import shutil
 import logging
-import logging.handlers
 from dateutil.parser import parse
 import uuid
 import geopandas as gpd
@@ -18,10 +17,10 @@ import rasterio
 import rasterio.features
 import gdal
 
-from . dc_water_classifier import wofs_classify
-from . dc_clean_mask import landsat_qa_clean_mask
-from . prep_utils import *
-from . dc_import_export import export_xarray_to_geotiff
+from workflows.utils.dc_water_classifier import wofs_classify
+from workflows.utils.dc_clean_mask import landsat_qa_clean_mask
+from workflows.utils.prep_utils import *
+from workflows.utils.dc_import_export import export_xarray_to_geotiff
 
 
     
@@ -156,7 +155,7 @@ def resamp_bands(xr, xrs):
         return xr.interp(x=xrs[0]['x'], y=xrs[0]['y'])
     
     
-def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='common_sensing/fiji/wofsdefault/', inter_dir='../tmp/data/intermediate/', aoi_mask=False):
+def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='common_sensing/fiji/wofsdefault/', inter_dir='../tmp/data/intermediate/', aoi_mask=False, **kwargs):
     """
     Generate and prepare wofs (and wofs-like) products for .
     Assumes all data can be found and downoaded using relative locations within yaml & dir name contains unique scene_name.
@@ -323,9 +322,7 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
             root.exception(f"{scene_name} Upload to S3 Failed")
             raise Exception('S3  upload error')
 
-        root.removeHandler(handler)
-        handler.close()
-        
+
         for i in o_bands_data: i.close()
         bands_data.close()
         clearsky_masks.close()
@@ -349,15 +346,8 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
 
             
     except:
-        print('boo')
-        root.exception("Processing INCOMPLETE so tidying up")
-        root.removeHandler(handler)
-        handler.close()
-
-        shutil.move(log_file, cog_dir + 'log_file.txt')
-        
-        s3_upload_cogs(glob.glob(cog_dir + '*log_file.txt'), s3_bucket, s3_dir)        
-                
+        # DELETE ANYTHING WITIN TEH TEMP DIRECTORY
         cmd = 'rm -frv {}'.format(inter_dir)
         p   = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
         out = p.stdout.read()
+        
