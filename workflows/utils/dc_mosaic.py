@@ -364,21 +364,23 @@ def unpack_bits(land_cover_endcoding, data_array, cover_type):
                         attrs = data_array.attrs)
 
 def ls8_unpack_qa( data_array , cover_type):
+    print("Applying ls8_unpack_qa")
+    # TODO: This is only for cover_type = 'water'
+    # make empty numpy array with same shape as data_array
+    boolean_mask = np.zeros(data_array.shape, dtype=bool)
+    # unpack bits
+    # make a mask where 4th bit is set
+    boolean_mask |= (data_array & 0b110000) != 0
+    # make a mask where 5th bit is set
+    # boolean_mask |= (data_array & 0b00100000) != 0
 
-    land_cover_endcoding = dict( fill         =[1] ,
-                                 clear        =[322, 386, 834, 898, 1346],
-                                 water        =[324, 388, 836, 900, 1348],
-                                 shadow       =[328, 392, 840, 904, 1350],
-                                 snow         =[336, 368, 400, 432, 848, 880, 812, 944, 1352],
-                                 cloud        =[352, 368, 416, 432, 848, 880, 912, 944, 1352],
-                                 low_conf_cl  =[322, 324, 328, 336, 352, 368, 834, 836, 840, 848, 864, 880],
-                                 med_conf_cl  =[386, 388, 392, 400, 416, 432, 898, 900, 904, 928, 944],
-                                 high_conf_cl =[480, 992],
-                                 low_conf_cir =[322, 324, 328, 336, 352, 368, 386, 388, 392, 400, 416, 432, 480],
-                                 high_conf_cir=[834, 836, 840, 848, 864, 880, 898, 900, 904, 912, 928, 944],
-                                 terrain_occ  =[1346,1348, 1350, 1352]
-                               )
-    return unpack_bits(land_cover_endcoding, data_array, cover_type)
+    # combine the two masks
+    return xr.DataArray(boolean_mask.astype(bool),
+                        coords = data_array.coords,
+                        dims = data_array.dims,
+                        name = cover_type + "_mask",
+                        attrs = data_array.attrs)
+
 
 
 def sen2_unpack_qa( data_array , cover_type):
