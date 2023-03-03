@@ -1,23 +1,22 @@
-numWorkersReplicas: 4
+numWorkersReplicas: 1
 
 image:
-  repository: ivicamaticsd/catapult-ard-docker-images
-  tag: latest
-  pullPolicy: Always
+    repository: ivicamaticsd/catapult-ard-docker-images
+    tag: dev
+    pullPolicy: Always
 
 copernicus_s1:
-    username: ""
-    password: ""
+    username: "richardewell1"
+    password: "COPEbutterfly01!"
 
 copernicus_s2:
-    username: ""
-    password: ""
-
+    username: "ivica.matic"
+    password: "9JEidrgBnsifjKyD"
 
 s3proxy:
-    jcloudsIdentity: ""
-    jcloudsEndpoint: ""
-    jcloudsCredential: ""
+    jcloudsIdentity: "testingcommonsensing"
+    jcloudsEndpoint: "https://testingcommonsensing.blob.core.windows.net"
+    jcloudsCredential: "oJMbHp/SAU3Pwcf0XV0BZChH/e2L+Xz9ddoPHVc0uNvbnZRhcgopKYX7aEZemo/zaY0Xo+qXvJdj+AStrzPz+Q=="
 
 redis:
     host: "ha-redis-master"
