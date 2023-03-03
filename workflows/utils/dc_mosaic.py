@@ -376,7 +376,7 @@ def ls8_unpack_qa( data_array , cover_type):
     #  1    0  - 34 to 66% water
     #  1    1  - 67 to 100% water
     #if cover_type == 'water':
-    boolean_mask |= (data_array & 0b100000) != 0
+    boolean_mask |= (data_array & 0b10000) != 0
 
 
     # if cover_type == 'clear':
