@@ -370,7 +370,7 @@ def ls8_unpack_qa( data_array , cover_type):
     boolean_mask = np.zeros(data_array.shape, dtype=bool)
     boolean_mask |= (data_array & 0b110000) != 0
 
-    # boolean_mask = ~boolean_mask
+    boolean_mask = ~boolean_mask
 
     # combine the two masks
     return xr.DataArray(boolean_mask.astype(bool),
