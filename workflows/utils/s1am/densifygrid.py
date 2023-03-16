@@ -38,43 +38,60 @@ class DensifyGrid:
         """
         entry point into class functionality
         """
+        print('DENSIFYING PROCESS')
+        print('ANNOTATION FILES:', annotation_files)
 
         # read annotation xml into dictionary
         for f in annotation_files:
 
+            print('------------------------RUNNING:', f)
+            print('TIME NOW:', datetime.now().strftime("%H:%M:%S"))
+
             doc = self.readAnnotationFile( f )
             if doc is not None:
 
+                print('XML FILES SUCCESSFULLY FOUND')
+
                 # get scene image dimensions
-#                 print ( 'Densifying geolocation grid in annotation file: {}'.format( f ) )
-                dims = self.getDimensions( doc )
+                # print ( 'Densifying geolocation grid in annotation file: {}'.format( f ) )
+                dims = self.getDimensions( doc )  # width = numberOfSamples, height = numberOfLines
 
                 # extract tie points from annotation schema and reproject to mercator
                 gcps = { 'latlon' : self.getTiePoints( doc ) }
                 gcps[ 'mercator' ] = self.reprojectTiePoints( gcps[ 'latlon' ], 
                                                                 { 'source' : self._proj[ 'latlon' ], 'target' : self._proj[ 'mercator' ] } )
 
+                print('GCPS SUCCESSFULLY REPROJECTED INTO MERCATOR SRS')
+
                 # create denser tie point grid 
                 x_grid, y_grid = self.getDenseGrid( dims, grid_pts )
-                dense_grid = { 'pixel' : x_grid.flatten(), 'line' : y_grid.flatten() }              
+                dense_grid = { 'pixel' : x_grid.flatten(), 'line' : y_grid.flatten() }
+
+                print('DENSE GRID CREATED')              
 
                 # interpolate parameter values onto dense grid
                 dense_grid.update ( self.interpolateFields( doc, ( gcps[ 'latlon' ][ 'pixel' ], gcps[ 'latlon' ][ 'line' ] ), ( x_grid, y_grid ) ) )
 
                 # interpolate gcps onto dense grid
                 geo_transform = gdal.GCPsToGeoTransform( gcps[ 'mercator' ] )
-#                 print ( '{}: Mean sum of squares: {} m '. format ( os.path.basename( f ), self.computeError( gcps[ 'mercator' ], geo_transform ) ) )
+                # print ( '{}: Mean sum of squares: {} m '. format ( os.path.basename( f ), self.computeError( gcps[ 'mercator' ], geo_transform ) ) )
 
+                # CURRENTLY STUCK TRYING TO DO THREADING FOR THE DENSE GRID
                 dense_grid[ 'gcps' ] = self.interpolateTiePoints( geo_transform, dense_grid[ 'pixel' ], dense_grid[ 'line' ] )
 
-                # optionally visualize dense grid map coordinates
+                print('FINISHED THREADING AND PROCESS JOINING')
+
+                # optionally visualize dense grid map coordinates - TRY this out?
                 if writeback:
                     self.plotDenseGrid( dense_grid, grid_pts )
 
                 # write denser tie point grid to updated annotation file and geotiff
                 self.writeAnnotationFile( doc, dense_grid )
                 # self.writeImageFile( doc, dense_grid )
-#                 print ( '... OK!' )
+                # print ( '... OK!' )
+
+            print('FINISHED DENSIFY GRID PROCESS')
+            print('TIME NOW:', datetime.now().strftime("%H:%M:%S"))
 
         return
 
@@ -99,11 +116,13 @@ class DensifyGrid:
         get scene dimensions
         """
 
-        # extract samples and lines
+        print('GETTING DIMENSIONS')
+
+        # extract samples and lines (doc['schema] => the whole structure of the xml file)
         schema = doc[ 'schema' ]
 
-        width = float ( schema[ 'product' ][ 'imageAnnotation' ][ 'imageInformation' ][ 'numberOfSamples' ] )
-        height = float ( schema[ 'product' ][ 'imageAnnotation' ][ 'imageInformation' ][ 'numberOfLines' ] )
+        width = float ( schema[ 'product' ][ 'imageAnnotation' ][ 'imageInformation' ][ 'numberOfSamples' ] )  # number of samples = width
+        height = float ( schema[ 'product' ][ 'imageAnnotation' ][ 'imageInformation' ][ 'numberOfLines' ] )  # number of lines = height
 
         return { 'width' : width, 'height' : height }
 
@@ -113,6 +132,7 @@ class DensifyGrid:
         """
         get tie points from annotation xml schema
         """
+        print('GETTING TIE POINTS')
 
         # create dict for output
         gcps = {  'pixel' : np.asarray([]),
@@ -123,7 +143,7 @@ class DensifyGrid:
 
         # load values from schema into data obj
         schema = doc[ 'schema' ]
-        for pt in schema[ 'product' ][ 'geolocationGrid' ][ 'geolocationGridPointList' ][ 'geolocationGridPoint' ]:
+        for pt in schema[ 'product' ][ 'geolocationGrid' ][ 'geolocationGridPointList' ][ 'geolocationGridPoint' ]:  # try remove [ 'geolocationGridPoint' ]
 
             # parse values in numpy arrays
             gcps[ 'pixel' ]  = np.append( gcps[ 'pixel' ], float( pt[ 'pixel' ] ) )
@@ -142,9 +162,11 @@ class DensifyGrid:
         generate gcp mesh grid with customisable spacing
         """
 
-        # create denser gcp mesh grid
+        print('GENERATING THE DENSER LIST')
+
+        # create denser gcp mesh grid - from 0 to width/height with grid_pts as the number of points
         x = np.linspace(0, dims[ 'width' ], grid_pts, endpoint=False); 
-        y = np.linspace(0, dims[ 'height' ], grid_pts, endpoint=False);
+        y = np.linspace(0, dims[ 'height' ], grid_pts, endpoint=False)
 
         X, Y = np.meshgrid(x, y, copy=False)
 
@@ -157,6 +179,8 @@ class DensifyGrid:
         interpolate dense geometry and timing data
         """
 
+        print('INTERPOLATING THE DENSE GRID')
+
         def getField( doc, field ):
 
             """
@@ -166,6 +190,12 @@ class DensifyGrid:
             # retrieve tie point field data
             B = np.asarray([]); schema = doc[ 'schema' ]
             for pt in schema[ 'product' ][ 'geolocationGrid' ][ 'geolocationGridPointList' ][ 'geolocationGridPoint' ]:
+
+                # print('INTERPOLATING POINTS:')
+                # print(pt)
+
+                # print('FIELD')
+                # print(field)
 
                 # convert time to epoch for interpolation
                 if field == 'azimuthTime':
@@ -179,9 +209,9 @@ class DensifyGrid:
             return B
 
 
-        # view / timing parameters associated with each tie point
+        # view / timing parameters associated with each tie point (AZIMUTH TIME, SLANT RANGE TIME, INCIDENT ANGLE, ELEVATION ANGLE)
         result = {}
-        for idx, field in enumerate( self._fields ):
+        for idx, field in enumerate( self._fields ):  # WHY do you need enumerate? (idx not used)
 
             # 1d interpolation of tie-point field data onto denser grid
             B = getField( doc, field )
@@ -197,6 +227,8 @@ class DensifyGrid:
         """
         get geographic coordinates for nodes of denser grid using linear algebra
         """
+
+        # print('INTERPOLATING TIE POINTS')
 
         # create dict for output
         num_samples = len( pixel )
@@ -223,7 +255,7 @@ class DensifyGrid:
 
             count = count + 1
 
-        return self.reprojectTiePoints( gcps, { 'source' : self._proj[ 'mercator' ], 'target' : self._proj[ 'latlon' ] } )
+        return self.reprojectTiePoints( gcps, { 'source' : self._proj[ 'mercator' ], 'target' : self._proj[ 'latlon' ] } )  # try with more threads?
 
 
     def reprojectTiePoints( self, gcps, projection, threads=4 ):
@@ -232,11 +264,15 @@ class DensifyGrid:
         reproject geographic coordinates to antemeridian friendly mercator SRS
         """
 
+        print('REPROJECTING TIE POINTS')
+
         def executeTask( task, gcps, projection, records ):
 
             """
             threading function for computing reprojection of point subset 
             """
+
+            print('EXECUTING THREADED PROCESS FOR REPROJECTING')
 
             # get geographic and tm projection objects
             srs_s = Proj(init=projection[ 'source' ]); srs_t = Proj(init=projection[ 'target' ])
@@ -268,6 +304,8 @@ class DensifyGrid:
             distribute reprojection of dense grid geographic coordinates across multiple threads
             """
 
+            print('CREATING THE TASK LIST FOR THE REPROJECTION THREADING')
+
             # determine optimal split
             samples = len( gcps[ 'pixel' ] )
             interval = int ( math.ceil ( samples / threads ) )
@@ -290,17 +328,32 @@ class DensifyGrid:
 
         # create thread per task
         threads = []
+        print('NUMBER OF TASKS:', len(tasks))
         for task in tasks:
 
             # We start one thread per url present.
             process = Thread(target=executeTask, args=[ task, gcps, projection, records ] )
-            process.start()
+            print('STARTING PROCESS')
             threads.append(process)
+            process.setDaemon(True)
+            print('IS DAEMON:', process.isDaemon())
+            process.start()
+            
+
+        print('TASKS COMPLETE')
+        print('JOINING PROCESSES')
 
         # pause main thread until all child threads complete
+        print('NUMBER OF PROCESSES:', len(threads))
+        num = 0
         for process in threads:
+            num += 1
+            print('PROCESS JOIN')
+            print('PROCESS NUM:', num)
             process.join()
+            print('PROCESS JOINED')
 
+        print('ALL PROCESSES JOINED')
         # flatten array of lists into single aggregated list
         return [ item for sublist in records for item in sublist ]
 
@@ -310,6 +363,8 @@ class DensifyGrid:
         """
         write annotation xml file with denser tie point grid
         """   
+
+        print('WRITING THE ANNOTATION FILE')
 
         # clear geolocation grid schema from doc
         schema = doc[ 'schema' ]
