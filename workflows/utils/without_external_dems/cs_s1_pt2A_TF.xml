@@ -14,15 +14,15 @@
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
       <sourceBands/>
-      <demName>External DEM</demName>
+      <demName>SRTM 3Sec</demName>
       <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
-      <externalDEMFile>$ext_dem</externalDEMFile>
-      <externalDEMNoDataValue>-9999</externalDEMNoDataValue>
-      <externalDEMApplyEGM>True</externalDEMApplyEGM>
+      <externalDEMFile/>
+      <nodataValueAtSea>false</nodataValueAtSea>
+      <externalDEMNoDataValue>-9999.0</externalDEMNoDataValue>
+      <externalDEMApplyEGM>false</externalDEMApplyEGM>
       <outputSimulatedImage>false</outputSimulatedImage>
       <additionalOverlap>0.1</additionalOverlap>
       <oversamplingMultiple>1.5</oversamplingMultiple>
-      <nodataValueAtSea>false</nodataValueAtSea>
     </parameters>
   </node>
   <node id="Write">

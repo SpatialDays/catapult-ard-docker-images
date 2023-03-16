@@ -114,12 +114,16 @@ def execute( name, arguments ):
 
     """              
     create and execute sub-process
+
+    In the case of processing subset of AM scene
+    name = snap gpt
+    arguments = the schema for gpt
     """
 
     # create sub-process with argument list
     p = subprocess.Popen( [name] + arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE )
     out, err = p.communicate()
-    code = p.poll();
+    code = p.poll()
 
     return out, err, code
 
