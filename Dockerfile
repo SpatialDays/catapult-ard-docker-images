@@ -27,7 +27,6 @@ RUN pip install --no-cache-dir \
     sentinelsat \
     xmltodict \
     beautifulsoup4 \
-    pyproj \
     lxml \
     boto3 \
     pyyaml \
@@ -64,7 +63,7 @@ RUN conda install geopandas
 RUN conda install requests
 RUN conda install scikit-learn
 RUN conda install xarray
-
+RUN pip install pyproj==2.6.1.post1
 
 RUN pip install --no-cache-dir \
     asynchronousfilereader \

@@ -480,7 +480,7 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
 
 
 if __name__ == '__main__':
-    prepare_S1AM('S1A_IW_GRDH_1SDV_20170724T174037_20170724T174100_017616_01D7A7_F0DA', 'fiji',s3_bucket = "ard-bucket")
+    prepare_S1AM('S1A_IW_GRDH_1SDV_20170328T063214_20170328T063226_015888_01A309_0E7F', 'fiji',s3_bucket = "ard-bucket")
 
     # region vars: 'solomon', 'fiji', 'vanuatu' ('default' or any other value for snap default dem)
 
