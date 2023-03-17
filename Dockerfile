@@ -9,15 +9,15 @@ LABEL maintainer="Luigi Di Fraia"
 #     && find /opt/conda/ -follow -type f -name '*.js.map' -delete
 
 RUN conda install --quiet --yes \
-    boto3 \
-    geopandas \
-    pip \
-    pyyaml \
-    rasterio \
-    && conda clean --all -f -y \
-    && find /opt/conda/ -follow -type f -name '*.a' -delete \
-    && find /opt/conda/ -follow -type f -name '*.pyc' -delete \
-    && find /opt/conda/ -follow -type f -name '*.js.map' -delete
+    # boto3 \
+    # geopandas \
+    pip 
+    # pyyaml \
+    # rasterio \
+    # && conda clean --all -f -y \
+    # && find /opt/conda/ -follow -type f -name '*.a' -delete \
+    # && find /opt/conda/ -follow -type f -name '*.pyc' -delete \
+    # && find /opt/conda/ -follow -type f -name '*.js.map' -delete
 
 RUN pip install --no-cache-dir \
     asynchronousfilereader \
@@ -28,30 +28,43 @@ RUN pip install --no-cache-dir \
     xmltodict \
     beautifulsoup4 \
     pyproj \
-    lxml
-
-RUN conda update conda --quiet --yes \
-    && conda clean --all -f -y \
-    && find /opt/conda/ -follow -type f -name '*.a' -delete \
-    && find /opt/conda/ -follow -type f -name '*.pyc' -delete \
-    && find /opt/conda/ -follow -type f -name '*.js.map' -delete
-
-RUN conda install --quiet --yes \
+    lxml \
     boto3 \
-    geopandas \
-    hdmedians \
-    matplotlib \
-    pandas \
-    pip \
     pyyaml \
-    rasterio \
-    requests \
-    scikit-learn \
-    xarray \
-    && conda clean --all -f -y \
-    && find /opt/conda/ -follow -type f -name '*.a' -delete \
-    && find /opt/conda/ -follow -type f -name '*.pyc' -delete \
-    && find /opt/conda/ -follow -type f -name '*.js.map' -delete
+    rasterio 
+
+# RUN conda update conda --quiet --yes \
+#     && conda clean --all -f -y \
+#     && find /opt/conda/ -follow -type f -name '*.a' -delete \
+#     && find /opt/conda/ -follow -type f -name '*.pyc' -delete \
+#     && find /opt/conda/ -follow -type f -name '*.js.map' -delete
+
+# RUN conda install --quiet --yes \
+#     boto3 \
+#     geopandas \
+#     hdmedians \
+#     matplotlib \
+#     pandas \
+#     pip \
+#     pyyaml \
+#     rasterio \
+#     requests \
+#     scikit-learn \
+#     xarray \
+#     # && conda clean --all -f -y \
+#     # && find /opt/conda/ -follow -type f -name '*.a' -delete \
+#     # && find /opt/conda/ -follow -type f -name '*.pyc' -delete \
+#     # && find /opt/conda/ -follow -type f -name '*.js.map' -delete
+
+RUN conda install boto3
+RUN conda install hdmedians
+RUN conda install matplotlib
+RUN conda install pandas
+RUN conda install geopandas
+RUN conda install requests
+RUN conda install scikit-learn
+RUN conda install xarray
+
 
 RUN pip install --no-cache-dir \
     asynchronousfilereader \

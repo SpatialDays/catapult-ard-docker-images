@@ -24,8 +24,8 @@ def find_s1_uuid(s1_filename):
     :param S1_file_name: Sentinel-2 scene name
     :return S1_uuid: download id
     """
-    copernicus_username = os.getenv("COPERNICUS_USERNAME", COPERNICUS_USERNAME)
-    copernicus_pwd = os.getenv("COPERNICUS_PWD", COPERNICUS_PWD)
+    copernicus_username = os.getenv("COPERNICUS_USERNAME")
+    copernicus_pwd = os.getenv("COPERNICUS_PWD")
     logging.debug(f"ESA username: {copernicus_username}")
     esa_api = SentinelAPI(copernicus_username, copernicus_pwd)
 
@@ -55,8 +55,8 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
         if not os.path.exists(zip_file_path):
             logging.info('Downloading ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
 
-            copernicus_username = os.getenv("COPERNICUS_USERNAME", COPERNICUS_USERNAME)
-            copernicus_pwd = os.getenv("COPERNICUS_PWD", COPERNICUS_PWD)
+            copernicus_username = os.getenv("COPERNICUS_USERNAME")
+            copernicus_pwd = os.getenv("COPERNICUS_PWD")
             logging.debug(f"ESA username: {copernicus_username}")
 
             try:
@@ -480,9 +480,9 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
 
 
 if __name__ == '__main__':
-    prepare_S1AM('S1A_IW_GRDH_1SDV_20170328T063214_20170328T063226_015888_01A309_0E7F', 'Fiji',s3_bucket = "ard-bucket")
+    prepare_S1AM('S1A_IW_GRDH_1SDV_20170724T174037_20170724T174100_017616_01D7A7_F0DA', 'fiji',s3_bucket = "ard-bucket")
 
-    # region vars: 'Solomon', 'Fiji', 'Vanuatu' ('default' or any other value for snap default dem)
+    # region vars: 'solomon', 'fiji', 'vanuatu' ('default' or any other value for snap default dem)
 
     # non-AM test: S1A_IW_GRDH_1SDV_20230118T174108_20230118T174131_046841_059DD6_8B3D
     # AM test: S1A_IW_GRDH_1SDV_20230218T173255_20230218T173312_047293_05AD04_C398
