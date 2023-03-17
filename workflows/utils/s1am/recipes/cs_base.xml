@@ -7,6 +7,17 @@
       <file>$input_grd</file>
     </parameters>
   </node>
+  <node id="ThermalNoiseRemoval">
+    <operator>ThermalNoiseRemoval</operator>
+    <sources>
+      <sourceProduct refid="Read"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <selectedPolarisations/>
+      <removeThermalNoise>true</removeThermalNoise>
+      <reIntroduceThermalNoise>false</reIntroduceThermalNoise>
+    </parameters>
+  </node>
   <node id="Remove-GRD-Border-Noise">
     <operator>Remove-GRD-Border-Noise</operator>
     <sources>
@@ -61,17 +72,6 @@
       <grSquarePixel>true</grSquarePixel>
     </parameters>
   </node>
-  <node id="ThermalNoiseRemoval">
-    <operator>ThermalNoiseRemoval</operator>
-    <sources>
-      <sourceProduct refid="Read"/>
-    </sources>
-    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <selectedPolarisations/>
-      <removeThermalNoise>true</removeThermalNoise>
-      <reIntroduceThermalNoise>false</reIntroduceThermalNoise>
-    </parameters>
-  </node>
   <node id="Terrain-Flattening">
     <operator>Terrain-Flattening</operator>
     <sources>
@@ -82,8 +82,8 @@
       <demName>External DEM</demName>
       <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
       <externalDEMFile>$ext_dem</externalDEMFile>
-      <externalDEMNoDataValue>-9999</externalDEMNoDataValue>
-      <externalDEMApplyEGM>True</externalDEMApplyEGM>
+      <externalDEMNoDataValue>-9999.0</externalDEMNoDataValue>
+      <externalDEMApplyEGM>true</externalDEMApplyEGM>
       <outputSimulatedImage>false</outputSimulatedImage>
       <additionalOverlap>0.1</additionalOverlap>
       <oversamplingMultiple>1.5</oversamplingMultiple>
@@ -95,7 +95,7 @@
       <sourceProduct refid="Terrain-Flattening"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <sourceBands/>
+      <sourceBands>Gamma0_VH, Gamma0_VV</sourceBands>
       <demName>External DEM</demName>
       <externalDEMFile>$ext_dem</externalDEMFile>
       <externalDEMNoDataValue>-9999.0</externalDEMNoDataValue>
@@ -138,7 +138,7 @@
       <sourceProduct refid="Terrain-Correction"/>
     </sources>
     <parameters class="com.bc.ceres.binding.dom.XppDomElement">
-      <sourceBands/>
+      <sourceBands>Gamma0_VH, Gamma0_VV</sourceBands>
     </parameters>
   </node>
   <node id="Write">

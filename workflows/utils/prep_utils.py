@@ -11,7 +11,8 @@ from asynchronousfilereader import AsynchronousFileReader
 import boto3
 import botocore
 import click
-import gdal
+# import gdal
+from osgeo import gdal
 import rasterio
 import requests
 import platform
@@ -24,6 +25,8 @@ from rasterio.io import MemoryFile
 from rasterio.shutil import copy
 import numpy as np
 import gc
+
+import shutil  # ONLY FOR COPYING VAN DEMS TO TPM FOLDER FOR TESTING
 
 class DownloadError(Exception):
     """Exception raised when a download fails."""
@@ -55,6 +58,7 @@ def discover_tiffs(in_dir):
 
 def conv_sgl_cog(in_path, out_path, nodata=0):
     # set default cog profile (as recommended by alex leith)
+    print('COG CREATING STAGE')
     cog_profile = {
         'driver': 'GTiff',
         'interleave': 'pixel',
@@ -94,35 +98,113 @@ def clean_up(work_dir: str) -> None:
 
 
 # Check if external DEMs need to be downloaded, and download them if necessary
-def download_external_dems(in_scene, scene_name, tmp_inter_dir, s3_bucket, root):
-    # Set the paths to the external DEMs to be downloaded
-    ext_dem_path_east = "common_sensing/ancillary_products/SRTM1Sec/SRTM30_Fiji_E.tif"
-    ext_dem_path_west = "common_sensing/ancillary_products/SRTM1Sec/SRTM30_Fiji_W.tif"
-    ext_dem_path_list = [ext_dem_path_east, ext_dem_path_west]
-    # Set the paths to where the external DEMs will be saved
-    ext_dem_path_east_local = f"{tmp_inter_dir}SRTM30_Fiji_E.tif"
-    ext_dem_path_west_local = f"{tmp_inter_dir}SRTM30_Fiji_W.tif"
-    ext_dem_path_local_list = [ext_dem_path_east_local, ext_dem_path_west_local]
+def download_external_dems(region, in_scene, scene_name, tmp_inter_dir, s3_bucket, root):
 
-    root.info(f"{in_scene} {scene_name}: Checking if we have external DEMs")
-    # Check if the external DEMs need to be downloaded
-    if any(not os.path.exists(path) for path in ext_dem_path_local_list):
-        root.info(f"{in_scene} {scene_name}: Downloading external DEMs")
-        # Download the external DEMs
-        for ext_dem_path, ext_dem_path_local in zip(ext_dem_path_list, ext_dem_path_local_list):
-            try:
-                root.debug(f"Downloading {ext_dem_path} to {ext_dem_path_local}")
-                s3_download(s3_bucket, ext_dem_path, ext_dem_path_local)
-            except Exception as e:
-                root.exception(e)
-                root.exception(f"{ext_dem_path} unavailable")
-                # If there's an error, raise an exception
-                raise Exception(f"Failed to download {ext_dem_path}") from e
-        root.info(f"{in_scene} {scene_name}: Downloaded external DEMs")
-    else:
-        root.info(f"{in_scene} {scene_name}: Found external DEMs, skipping download")
+    # ADJUST THIS PROCESS ONCE THE OTHER DEMS ARE ON THE S3 BUCKET
+
+    avaliable_regions = ['fiji', 'vanuatu', 'solomon']  # MAKE THIS AN ENV VAR (see also raw2ard.py)
+
+    print('REGION LOWER:', region.lower())
+
+    if region.lower() in avaliable_regions:
+
+        region_name = region.capitalize()
+        print('REGION NAME:', region_name)
+
+        if region_name == 'Fiji':
+
+            print(f'CREATING EXT DEM PATHS FOR {region_name}')
+
+            # Set the paths to the external DEMs to be downloaded
+            ext_dem_path_east = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name}_E.tif"
+            ext_dem_path_west = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name}_W.tif"
+            ext_dem_path_list = [ext_dem_path_east, ext_dem_path_west]
+
+            ext_dem_path_east_local = f"{tmp_inter_dir}SRTM30_{region_name}_E.tif"
+            ext_dem_path_west_local = f"{tmp_inter_dir}SRTM30_{region_name}_W.tif"
+            ext_dem_path_local_list = [ext_dem_path_east_local, ext_dem_path_west_local]
+        else:
+            # for vanuatu and solmon there is only 1 dem
+            print(f'CREATING EXT DEM PATHS FOR {region_name}')
+
+            ext_dem_path = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name}.tif"
+            ext_dem_path_list = [ext_dem_path]
+
+            ext_dem_path_local = f"{tmp_inter_dir}SRTM30_{region_name}.tif"
+            ext_dem_path_local_list = [ext_dem_path_local]
+
+
+        root.info(f"{in_scene} {scene_name}: Checking if we have external DEMs")
+        # Check if the external DEMs need to be downloaded
+        if any(not os.path.exists(path) for path in ext_dem_path_local_list):
+            root.info(f"{in_scene} {scene_name}: Downloading external DEMs")
+            # Download the external DEMs
+            for ext_dem_path, ext_dem_path_local in zip(ext_dem_path_list, ext_dem_path_local_list):
+                try:
+                    root.debug(f"Downloading {ext_dem_path} to {ext_dem_path_local}")
+                    s3_download(s3_bucket, ext_dem_path, ext_dem_path_local)
+                except Exception as e:
+                    root.exception(e)
+                    root.exception(f"{ext_dem_path} unavailable")
+                    # If there's an error, raise an exception
+                    raise Exception(f"Failed to download {ext_dem_path}") from e
+            root.info(f"{in_scene} {scene_name}: Downloaded external DEMs")
+        else:
+            root.info(f"{in_scene} {scene_name}: Found external DEMs, skipping download")
         
-    return ext_dem_path_list
+        return ext_dem_path_local_list  # ext_dem_path_list
+
+    else:
+        print('RETURNING NONE => WILL USE SNAP DEMS')
+        return None  # no external dems => will use snap defaults
+
+
+
+
+    # if region == 'fiji':
+
+    #     # Set the paths to the external DEMs to be downloaded
+    #     ext_dem_path_east = "common_sensing/ancillary_products/SRTM1Sec/SRTM30_Fiji_E.tif"
+    #     ext_dem_path_west = "common_sensing/ancillary_products/SRTM1Sec/SRTM30_Fiji_W.tif"
+
+    #     ext_dem_path_list = [ext_dem_path_east, ext_dem_path_west]
+    #     # Set the paths to where the external DEMs will be saved
+    #     # print('SAVING DEMS TO LOCAL MACHINE')
+    #     # tmp_inter_dir = '/home/spatialdaysubuntu/'
+    #     ext_dem_path_east_local = f"{tmp_inter_dir}SRTM30_Fiji_E.tif"
+    #     ext_dem_path_west_local = f"{tmp_inter_dir}SRTM30_Fiji_W.tif"
+
+    #     ext_dem_path_local_list = [ext_dem_path_east_local, ext_dem_path_west_local]
+
+    #     root.info(f"{in_scene} {scene_name}: Checking if we have external DEMs")
+    #     # Check if the external DEMs need to be downloaded
+    #     if any(not os.path.exists(path) for path in ext_dem_path_local_list):
+    #         root.info(f"{in_scene} {scene_name}: Downloading external DEMs")
+    #         # Download the external DEMs
+    #         for ext_dem_path, ext_dem_path_local in zip(ext_dem_path_list, ext_dem_path_local_list):
+    #             try:
+    #                 root.debug(f"Downloading {ext_dem_path} to {ext_dem_path_local}")
+    #                 s3_download(s3_bucket, ext_dem_path, ext_dem_path_local)
+    #             except Exception as e:
+    #                 root.exception(e)
+    #                 root.exception(f"{ext_dem_path} unavailable")
+    #                 # If there's an error, raise an exception
+    #                 raise Exception(f"Failed to download {ext_dem_path}") from e
+    #         root.info(f"{in_scene} {scene_name}: Downloaded external DEMs")
+    #     else:
+    #         root.info(f"{in_scene} {scene_name}: Found external DEMs, skipping download")
+
+    # elif region == 'vanuatu':
+    #     src_path = '/home/spatialdaysubuntu/Documents/learning/learn_esa_snap/van_dems/Van_DSM30m_32b_UoP_Geo.tif'
+    #     dst_path = f'{tmp_inter_dir}Van_DSM30m_32b_UoP_Geo.tif'  # Van_DSM30m_16bs_UoP_Geo.tif, Van_DSM30m_32b_UoP_Geo.tif
+    #     shutil.copy(src_path, dst_path)
+    #     print('VANUATU DEM COPIED TO TMP DIR')
+
+    #     ext_dem_path_local_list = dst_path
+    #     # ext_dem_path_list = dst_path
+    # else:
+    #     ext_dem_path_local_list = None
+    #     # ext_dem_path_list = None
 
 
 def setup_logging():
@@ -153,11 +235,13 @@ def run_snap_command(command, timeout =  60*45):
     :return: None
     """
 
+    print('RUNNING SNAP COMMAND')
+
     # if we need to prepend the snap executable.
-    if command[0] != os.environ['SNAP_GPT']:
-        full_command = [os.environ['SNAP_GPT']] + command
-    else:
-        full_command = command
+    # if command[0] != os.environ['SNAP_GPT']:
+    #     full_command = [os.environ['SNAP_GPT']] + command
+    # else:
+    full_command = command
 
     # on linux there is a warning message printed by snap if this environment variable is not set.
     base_env = os.environ.copy()
@@ -276,6 +360,7 @@ def get_geometry(path):
     """
     logging.debug(f"in get geometry {path}")
     with rasterio.open(path) as img:
+        print('IMAGE META:', img.meta)
         left, bottom, right, top = img.bounds
         crs = str(str(getattr(img, 'crs_wkt', None) or img.crs.wkt))
         corners = {
@@ -343,15 +428,15 @@ def s3_create_client(s3_bucket):
     :return: the s3 client object.
     """
 
-    access = os.getenv("AWS_ACCESS_KEY_ID")
-    secret = os.getenv("AWS_SECRET_ACCESS_KEY")
+    access = os.getenv("AWS_ACCESS_KEY_ID", 'none')
+    secret = os.getenv("AWS_SECRET_ACCESS_KEY", 'none')
 
     session = boto3.Session(
         access,
         secret,
     )
 
-    endpoint_url = os.getenv("S3_ENDPOINT")
+    endpoint_url = os.getenv("S3_ENDPOINT", 'http://localhost:30003')
 
     if endpoint_url is not None:
         logging.debug('Endpoint URL: {}'.format(endpoint_url))
