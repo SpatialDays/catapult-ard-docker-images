@@ -368,11 +368,9 @@ def ls8_unpack_qa( data_array , cover_type):
     # TODO: This is only for cover_type = 'water'
     # make empty numpy array with same shape as data_array
     boolean_mask = np.zeros(data_array.shape, dtype=bool)
-    # unpack bits
-    # make a mask where 4th bit is set
     boolean_mask |= (data_array & 0b110000) != 0
-    # make a mask where 5th bit is set
-    # boolean_mask |= (data_array & 0b00100000) != 0
+
+    boolean_mask = ~boolean_mask
 
     # combine the two masks
     return xr.DataArray(boolean_mask.astype(bool),
