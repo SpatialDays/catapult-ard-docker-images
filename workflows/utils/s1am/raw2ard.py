@@ -21,6 +21,8 @@ from . densifygrid import DensifyGrid
 
 import pdb
 
+root = setup_logging()
+
 class Raw2Ard:
 
     def __init__( self, chunks=6, gpt='/opt/snap/bin/gpt' ):
@@ -48,9 +50,10 @@ class Raw2Ard:
     def create_source_bands(self, bands):
         result = ""
         for x in bands:
-            result = result + "Gamma0_" + x.upper() + ", "
+            result = result + "Gamma0_" + x.upper() + ","
 
-        return result[:-2]  # take the last comma off the end
+        print(f'CREATED SOURCE BANDS: {result[:-1]}')
+        return result[:-1]  # take the last comma off the end
 
 
     def create_selected_polarisations(self, bands):
@@ -84,6 +87,7 @@ class Raw2Ard:
         """
 
         ext_dem = ext_dem_path_list_local
+        scene_name = in_scene[:32]
 
         # update arguments
         self.getArguments( args )
@@ -130,10 +134,11 @@ class Raw2Ard:
     
             # process subset blocks either side of antemeridian
             print('PROCESSING EITHER SIDE OF THE AM')
-            results = []
+            # results = []
             # subset_images = []
             for hemisphere in [ 'east', 'west' ]:
 
+                results = []  # redefining per hemisphere
                 print('PROCESSING:', hemisphere)
                 print('TIME NOW:', datetime.now().strftime("%H:%M:%S"))
 
@@ -240,24 +245,51 @@ class Raw2Ard:
 
                     print('PROCESSED THAT BLOCK, MOVING ONTO NEXT')
 
-                    # print('FINISHED PREPROCESSING')
-                    # print('EXITING TEST')
-                    # raise SystemExit  # REMOVE AFTER TESTING!!!
+
 
                     # move onto next block
                     start_row += chunk_size
-            
-            # print('THIS IS ALL THE SUBSET IMAGES:', subset_images)
 
-            # print('mosaic VV')
+                ############# within the East and then West loops
+
+                # getting each hemisphere's mosaic in each polarisation and their paths
+                if hemisphere == 'east':
+                    vv_east_mosaic_path = self.generateImage( out_path, results, 'VV', scene_name, hemisphere )
+                    # vv_east_mosaic_path = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_VV_db.tif' )
+                    vh_east_mosaic_path = self.generateImage( out_path, results, 'VH', scene_name, hemisphere )
+                    # vh_east_mosaic_path = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_VH_db.tif' )
+
+                    print(f'EAST RESULTS: {results}')
+
+                else:
+                    vv_west_mosaic_path = self.generateImage( out_path, results, 'VV', scene_name, hemisphere )
+                    # vv_west_mosaic_path = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_VV_db.tif' )
+                    vh_west_mosaic_path = self.generateImage( out_path, results, 'VH', scene_name, hemisphere )
+                    # vh_west_mosaic_path = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_VH_db.tif' )
+
+            # use gdal warp to create mosaic from the east and west tiffs in each hemisphere
+            # print('ATTEMPTING TO MERGE EAST AND WEST IMAGES FOR VV AND VH')
+            # kwargs = { 'format': 'GTiff', 'srcNodata' : 0.0}  # , 'dstSRS' : 'epsg:4326' 
+            # vv_images = [vv_east_mosaic_path, vv_west_mosaic_path]
+            # vh_images = [vh_east_mosaic_path, vh_west_mosaic_path]
+
+            # vv_pathname = os.path.join( out_path, f'{scene_name}_Gamma0_VV_db.tif' )
+            # vh_pathname = os.path.join( out_path, f'{scene_name}_Gamma0_VH_db.tif' )
+                
+            # vv_ds = gdal.Warp( vv_pathname, vv_images, **kwargs )
+            # del vv_ds
+            # vh_ds = gdal.Warp( vh_pathname, vh_images, **kwargs )
+            # del vh_ds
+
+        
+            # OLD METHOD ------ CREATING MOSAIC OF THE EAST AND WEST TOGETHER
             # mosaic subsets into single image
-            vv_mosaic = self.generateImage( out_path, results, 'VV' )
-            vv_mosaic_path = os.path.join( out_path, 'Gamma0_VV_db.tif' )
-            # print('mosaic VH')
-            vh_mosaic = self.generateImage( out_path, results, 'VH' )
-            vv_mosaic_path = os.path.join( out_path, 'Gamma0_VH_db.tif' )
+            # vv_mosaic = self.generateImage( out_path, results, 'VV' )
+            # vv_mosaic_path = os.path.join( out_path, 'Gamma0_VV_db.tif' )
+            # vh_mosaic = self.generateImage( out_path, results, 'VH' )
+            # vv_mosaic_path = os.path.join( out_path, 'Gamma0_VH_db.tif' )
 
-            return [vv_mosaic_path, vv_mosaic_path, 'S1AM']
+            return ['S1AM', vv_east_mosaic_path, vh_east_mosaic_path, vv_west_mosaic_path, vh_west_mosaic_path]  # ['S1AM', vv_pathname, vh_pathname] # # ['S1AM', vv_mosaic_path, vv_mosaic_path]
 
         else:
 
@@ -278,7 +310,7 @@ class Raw2Ard:
             out_dir2 = out_prod2[:-4] + '.data/'
             down_dir = tmp_path + in_scene + '/'
     
-            snap_gpt = '/opt/snap/bin/gpt'  # '/home/spatialdaysubuntu/esa_snap/bin/gpt'  # os.environ['SNAP_GPT']  # ENV VAR
+            snap_gpt = os.getenv("GPT_PATH", '/opt/snap/bin/gpt')  # '/home/spatialdaysubuntu/esa_snap/bin/gpt'  # os.environ['SNAP_GPT']  # ENV VAR '/opt/snap/bin/gpt'
             int_graph_1 = 'workflows/utils/cs_s1_pt1_bnr_Orb_Cal_ML.xml'  # os.environ['S1_PROCESS_P1A']  # ENV VAR
 
 
@@ -319,7 +351,7 @@ class Raw2Ard:
                 int_graph_3 = 'workflows/utils/without_external_dems/cs_s1_pt3A_TC_db.xml'  # os.environ['S1_PROCESS_P3A']  # CREATE ENV VAR
                 int_graph_4 = 'workflows/utils/without_external_dems/cs_s1_pt4A_Sm_Bm_TC_lsm.xml'  # os.environ['S1_PROCESS_P4A', ]  # CREATE ENV VAR
             
-            root = setup_logging()
+            # root = setup_logging()
             root.info('{} {} Starting'.format(in_scene, scene_name))
             
             ###--- the S1 preprocessing steps with snap gpt
@@ -432,7 +464,7 @@ class Raw2Ard:
                 logging.critical(e, exc_info=True) 
                 print('SNAP GPT PREPROCESSING FAILED')
         
-            return [out_prod1, out_prod2, 'S1']
+            return ['S1', out_prod1, out_prod2]
     
 
     def getArguments( self, args ):
@@ -856,7 +888,7 @@ class Raw2Ard:
         return [ subset[ 'x1' ], subset[ 'y1' ], subset[ 'x2' ], subset[ 'y2' ] - subset[ 'y1' ] ]
 
 
-    def generateImage( self, out_path, results, pol ):
+    def generateImage( self, out_path, results, pol, scene_name, hemisphere ):
 
         """
         combine subset output images into single mosaic 
@@ -876,16 +908,14 @@ class Raw2Ard:
             if len( files ) == 1:
                 images.append( str ( files[ 0 ] ) )
 
-        print('POL:', pol)
-        print('IMAGES:', images)
         # use gdal warp to create mosaic
-        kwargs = { 'format': 'GTiff', 'srcNodata' : 0.0, 'dstSRS' : 'epsg:3460' }  # needs epsg 4326 - but this causes gdal disk space error?
-        pathname = os.path.join( out_path, 'Gamma0_{}_db.tif'.format( pol ) )  # add the name of the scene here too
+        kwargs = { 'format': 'GTiff', 'srcNodata' : 0.0, 'dstSRS' : 'epsg:4326' }  # needs epsg 4326 - but this causes gdal disk space error?  # 3460
+        pathname = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_{pol}_db.tif' )
 
         ds = gdal.Warp( pathname, images, **kwargs )  # (output dataset name/object, array of dataset objects or filenames, kwargs)
         print('WHAT IS DS:', ds)
         del ds
 
-        return
+        return pathname
 
 
