@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: ard-docker-images-landsat8
 spec:
-  replicas: {{ .Values.numWorkersReplicas }}
+  replicas: {{ .Values.numWorkerReplicasLandsat }}
   selector:
     matchLabels:
       app: ard-docker-images-landsat8
