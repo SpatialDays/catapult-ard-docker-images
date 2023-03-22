@@ -10,7 +10,7 @@ env:
  BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 
  
 jobs:
-  workfinder:
+  build:
     runs-on: ubuntu-latest
     environment: DOCKERHUB_ENVIRONMENT
     steps:
@@ -36,6 +36,7 @@ jobs:
         with:
           context: ./
           file: Dockerfile
+          cache-from: type=registry,ref=ivicamaticsd/catapult-ard-docker-images:${{ env.BRANCH_NAME }}
           push: true
           tags: ivicamaticsd/catapult-ard-docker-images:${{ env.BRANCH_NAME }}
 
