@@ -63,10 +63,12 @@ RUN wget --quiet http://step.esa.int/thirdparties/sen2cor/2.8.0/Sen2Cor-02.08.00
 RUN chmod +x Sen2Cor-02.08.00-Linux64.run
 RUN ./Sen2Cor-02.08.00-Linux64.run 
 
-# # RUN wget --quiet http://step.esa.int/downloads/7.0/installers/esa-snap_sentinel_unix_7_0.sh \
-# #     && /bin/sh ./esa-snap_sentinel_unix_7_0.sh -q \
-# #     && rm ./esa-snap_sentinel_unix_7_0.sh \
-# #     && /opt/snap/bin/snap --nosplash --nogui --modules --update-all
+COPY update_snap.sh .
+RUN chmod +x update_snap.sh
+RUN ./update_snap.sh
+
+RUN mkdir -p /opt/snap/bin && ln -s /usr/local/bin/snap /opt/snap/bin/snap
+RUN mkdir -p /opt/snap/bin && ln -s /usr/local/snap/bin/gpt /opt/snap/bin/gpt
 
 COPY workflows/utils/s1am/snap/bin/gpt.vmoptions /opt/snap/bin
 COPY workflows/utils/s1am/snap/etc/snap.auxdata.properties /opt/snap/etc
