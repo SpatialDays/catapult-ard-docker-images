@@ -31,11 +31,7 @@ class Raw2Ard:
         constructor function
         """
 
-        # get xml schema
-        #         with open ( './s1am/recipes/base.xml' ) as fd: # make var path
-        #             self._base = xmltodict.parse( fd.read() )
-        #         with open ( os.getenv( 'S1_PROCESS_P1A' ) ) as fd: # make var path
-        with open ( 'workflows/utils/s1am/recipes/cs_base.xml' ) as fd: # make var path?
+        with open ( 'workflows/utils/s1am/recipes/cs_base.xml' ) as fd:
             self._pt1 = xmltodict.parse( fd.read() )
 
         self._densify = DensifyGrid()
@@ -53,7 +49,7 @@ class Raw2Ard:
             result = result + "Gamma0_" + x.upper() + ","
 
         print(f'CREATED SOURCE BANDS: {result[:-1]}')
-        return result[:-1]  # take the last comma off the end
+        return result[:-1]  # takes the last comma off the end
 
 
     def create_selected_polarisations(self, bands):
@@ -63,7 +59,7 @@ class Raw2Ard:
         
         print('CREATED SELECTED POLS:', result[:-2])
 
-        return result[:-2]  # take the last comma off the end
+        return result[:-2]  # takes the last comma off the end
 
 
     def available_bands(self, source):
@@ -226,6 +222,7 @@ class Raw2Ard:
                     out = xmltodict.unparse( schema, pretty=True )
                     cfg_pathname = os.path.join ( tmp_path, '{}.xml'.format( os.path.basename(outname_pt1) ) )# path to the xml file to be executed for preprocessing?
                     with open( cfg_pathname, 'w+') as file:
+                        print(f'xml file: ', file)
                         file.write(out)
 
                     ##### execute PT1 processing for subset --- WHAT IS THIS EVEN DOING? #####
@@ -255,39 +252,11 @@ class Raw2Ard:
                 # getting each hemisphere's mosaic in each polarisation and their paths
                 if hemisphere == 'east':
                     vv_east_mosaic_path = self.generateImage( out_path, results, 'VV', scene_name, hemisphere )
-                    # vv_east_mosaic_path = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_VV_db.tif' )
                     vh_east_mosaic_path = self.generateImage( out_path, results, 'VH', scene_name, hemisphere )
-                    # vh_east_mosaic_path = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_VH_db.tif' )
-
-                    print(f'EAST RESULTS: {results}')
 
                 else:
                     vv_west_mosaic_path = self.generateImage( out_path, results, 'VV', scene_name, hemisphere )
-                    # vv_west_mosaic_path = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_VV_db.tif' )
                     vh_west_mosaic_path = self.generateImage( out_path, results, 'VH', scene_name, hemisphere )
-                    # vh_west_mosaic_path = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_VH_db.tif' )
-
-            # use gdal warp to create mosaic from the east and west tiffs in each hemisphere
-            # print('ATTEMPTING TO MERGE EAST AND WEST IMAGES FOR VV AND VH')
-            # kwargs = { 'format': 'GTiff', 'srcNodata' : 0.0}  # , 'dstSRS' : 'epsg:4326' 
-            # vv_images = [vv_east_mosaic_path, vv_west_mosaic_path]
-            # vh_images = [vh_east_mosaic_path, vh_west_mosaic_path]
-
-            # vv_pathname = os.path.join( out_path, f'{scene_name}_Gamma0_VV_db.tif' )
-            # vh_pathname = os.path.join( out_path, f'{scene_name}_Gamma0_VH_db.tif' )
-                
-            # vv_ds = gdal.Warp( vv_pathname, vv_images, **kwargs )
-            # del vv_ds
-            # vh_ds = gdal.Warp( vh_pathname, vh_images, **kwargs )
-            # del vh_ds
-
-        
-            # OLD METHOD ------ CREATING MOSAIC OF THE EAST AND WEST TOGETHER
-            # mosaic subsets into single image
-            # vv_mosaic = self.generateImage( out_path, results, 'VV' )
-            # vv_mosaic_path = os.path.join( out_path, 'Gamma0_VV_db.tif' )
-            # vh_mosaic = self.generateImage( out_path, results, 'VH' )
-            # vv_mosaic_path = os.path.join( out_path, 'Gamma0_VH_db.tif' )
 
             return ['S1AM', vv_east_mosaic_path, vh_east_mosaic_path, vv_west_mosaic_path, vh_west_mosaic_path]  # ['S1AM', vv_pathname, vh_pathname] # # ['S1AM', vv_mosaic_path, vv_mosaic_path]
 
