@@ -23,8 +23,8 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: Docker pull for faster build times
-        run: docker pull ivicamaticsd/catapult-ard-docker-images:${{ env.BRANCH_NAME }}
+#       - name: Docker pull for faster build times
+#         run: docker pull ivicamaticsd/catapult-ard-docker-images:${{ env.BRANCH_NAME }}
 
       - name: Set up Docker Buildx
         id: buildx
@@ -36,7 +36,8 @@ jobs:
         with:
           context: ./
           file: Dockerfile
-          cache-from: type=registry,ref=ivicamaticsd/catapult-ard-docker-images:${{ env.BRANCH_NAME }}
+          cache-from: type=registry,ref=ivicamaticsd/catapult-ard-docker-images-build-cache .
+          cache-to: type=registry, ref=ivicamaticsd/catapult-ard-docker-images-build-cache
           push: true
           tags: ivicamaticsd/catapult-ard-docker-images:${{ env.BRANCH_NAME }}
 
