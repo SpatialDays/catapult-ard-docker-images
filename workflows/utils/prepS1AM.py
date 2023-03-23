@@ -8,7 +8,7 @@ from zipfile import ZipFile
 from pyproj import CRS
 from osgeo import gdal
 
-# TODO ADD TO REQUIREMENTS
+# TO DO ADD TO REQUIREMENTS
 from bs4 import BeautifulSoup
 from workflows.utils.prep_utils import *
 
@@ -95,31 +95,6 @@ def band_name_s1(prod_path):
     return 'unknown layer'
 
 
-##### from AM code
-# def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, overwrite=False):
-#     """
-#     # Convert S1 scene products to cogs [+ validate].
-#     """
-
-#     if not os.path.exists(noncog_scene_dir):
-#         logging.warning('Cannot find non-cog scene directory: {}'.format(noncog_scene_dir))
-
-#     # create cog scene directory - replace with one lined os.makedirs(exists_ok=True)
-#     if not os.path.exists(cog_scene_dir):
-#         logging.warning('Creating scene cog directory: {}'.format(cog_scene_dir))
-#         os.mkdir(cog_scene_dir)
-
-#     prod_paths = discover_tiffs(noncog_scene_dir)
-
-#     logging.info(f"found {len(prod_paths)} products to convert to cog from {noncog_scene_dir}")
-
-#     # iterate over prods to create parellel processing list
-#     for prod in prod_paths:
-#         out_filename = os.path.join(cog_scene_dir, scene_name + '_' + os.path.basename(prod)[:-4] + 'tif')  # - TO DO*****
-#         logging.info(f"converting {prod} to cog at {out_filename}")
-#         # ensure input file existsscene_cogs
-#         to_cog(prod, out_filename, nodata=-9999)
-
 def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, fiji_AM=False, overwrite=False): # REMOVE fiji_AM=False IF THIS WORKS
     """
     Convert S1 scene products to cogs [+ validate].
@@ -194,13 +169,15 @@ def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, fiji_AM=False
     for prod in prod_paths:
         # NEED TO ONLY GET THE PRODS WITH THE EAST FOR EAST DIR ETC
         root.info(f'the prod is: {prod}')
-        if '_E' in cog_scene_dir and 'east' in prod: 
+        # if '_E' in cog_scene_dir and 'east' in prod: 
+        if fiji_AM and 'east' in prod: 
             out_filename = os.path.join(cog_scene_dir,
                                     scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
             logging.info(f"converting {prod} to cog at {out_filename}")
             # ensure input file exists
             to_cog(prod, out_filename, nodata=-9999)
-        elif '_W' in cog_scene_dir and 'west' in prod:
+        # elif '_W' in cog_scene_dir and 'west' in prod:
+        elif fiji_AM and 'west' in prod:
             out_filename = os.path.join(cog_scene_dir,
                                     scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
             logging.info(f"converting {prod} to cog at {out_filename}")
@@ -468,10 +445,6 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
     down_zip = inter_dir + in_scene.replace('.SAFE','.zip')
     down_dir = inter_dir + in_scene + '/'
 
-    # print('DOWN ZIP:', down_zip)
-    # print('IN SCENE:', in_scene)
-    # print('SCENE NAME:', scene_name)
-
 
     # root.info(f'download dir: {down_dir}')
     ########## UNCOMMENT AFTER YAML TESTING
@@ -649,7 +622,7 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
 
 
 if __name__ == '__main__':
-    prepare_S1AM('S1A_IW_GRDH_1SDV_20170724T174037_20170724T174100_017616_01D7A7_F0DA', 'fiji',s3_bucket = "ard-bucket")
+    prepare_S1AM('S1A_IW_GRDH_1SDV_20170328T063214_20170328T063226_015888_01A309_0E7F', 'fiji',s3_bucket = "ard-bucket")
 
     # region vars: 'solomon', 'fiji', 'vanuatu' ('default' or any other value for snap default dem)
 

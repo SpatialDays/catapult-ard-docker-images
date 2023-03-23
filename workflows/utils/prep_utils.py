@@ -127,29 +127,30 @@ def download_external_dems(region, in_scene, scene_name, tmp_inter_dir, s3_bucke
 
     if region.lower() in avaliable_regions:
 
-        region_name = region.capitalize()
+        region_name = region.lower()  # .capitalize()
         print('REGION NAME:', region_name)
 
-        if region_name == 'Fiji':
+        if region_name.lower() == 'fiji':
 
             print(f'CREATING EXT DEM PATHS FOR {region_name}')
 
             # Set the paths to the external DEMs to be downloaded
-            ext_dem_path_east = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name}_E.tif"
-            ext_dem_path_west = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name}_W.tif"
+            ext_dem_path_east = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name.capitalize()}_E.tif"
+            ext_dem_path_west = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name.capitalize()}_W.tif"
             ext_dem_path_list = [ext_dem_path_east, ext_dem_path_west]
 
-            ext_dem_path_east_local = f"{tmp_inter_dir}SRTM30_{region_name}_E.tif"
-            ext_dem_path_west_local = f"{tmp_inter_dir}SRTM30_{region_name}_W.tif"
+            ext_dem_path_east_local = f"{tmp_inter_dir}ext_dem_{region_name}_e.tif"  # changing SRTM => ext_dem incase of confusion with esa snap gpt
+            ext_dem_path_west_local = f"{tmp_inter_dir}ext_dem_{region_name}_w.tif"
+            # ext_dem_path_west_local = f"{tmp_inter_dir}SRTM30_{region_name}_W.tif"
             ext_dem_path_local_list = [ext_dem_path_east_local, ext_dem_path_west_local]
         else:
             # for vanuatu and solmon there is only 1 dem
             print(f'CREATING EXT DEM PATHS FOR {region_name}')
 
-            ext_dem_path = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name}.tif"
+            ext_dem_path = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name.capitalize()}.tif"
             ext_dem_path_list = [ext_dem_path]
 
-            ext_dem_path_local = f"{tmp_inter_dir}SRTM30_{region_name}.tif"
+            ext_dem_path_local = f"{tmp_inter_dir}ext_dem_{region_name}.tif"
             ext_dem_path_local_list = [ext_dem_path_local]
 
 
