@@ -6,6 +6,7 @@ import uuid
 from sentinelsat import SentinelAPI
 from zipfile import ZipFile
 from pyproj import CRS
+from osgeo import gdal
 
 # TODO ADD TO REQUIREMENTS
 from bs4 import BeautifulSoup
@@ -24,8 +25,8 @@ def find_s1_uuid(s1_filename):
     :param S1_file_name: Sentinel-2 scene name
     :return S1_uuid: download id
     """
-    copernicus_username = os.getenv("COPERNICUS_USERNAME", COPERNICUS_USERNAME)
-    copernicus_pwd = os.getenv("COPERNICUS_PWD", COPERNICUS_PWD)
+    copernicus_username = os.getenv("COPERNICUS_USERNAME")
+    copernicus_pwd = os.getenv("COPERNICUS_PWD")
     logging.debug(f"ESA username: {copernicus_username}")
     esa_api = SentinelAPI(copernicus_username, copernicus_pwd)
 
@@ -55,8 +56,8 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
         if not os.path.exists(zip_file_path):
             logging.info('Downloading ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
 
-            copernicus_username = os.getenv("COPERNICUS_USERNAME", COPERNICUS_USERNAME)
-            copernicus_pwd = os.getenv("COPERNICUS_PWD", COPERNICUS_PWD)
+            copernicus_username = os.getenv("COPERNICUS_USERNAME")
+            copernicus_pwd = os.getenv("COPERNICUS_PWD")
             logging.debug(f"ESA username: {copernicus_username}")
 
             try:
@@ -119,18 +120,31 @@ def band_name_s1(prod_path):
 #         # ensure input file existsscene_cogs
 #         to_cog(prod, out_filename, nodata=-9999)
 
-def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, overwrite=False):
+def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, fiji_AM=False, overwrite=False): # REMOVE fiji_AM=False IF THIS WORKS
     """
     Convert S1 scene products to cogs [+ validate].
     """
 
     if not os.path.exists(noncog_scene_dir):
-        logging.warning('Cannot find non-cog scene directory: {}'.format(noncog_scene_dir))
+        logging.warning(f'Cannot find non-cog scene directory: {noncog_scene_dir}')
 
     # create cog scene directory - replace with one lined os.makedirs(exists_ok=True)
     if not os.path.exists(cog_scene_dir):
-        logging.warning('Creating scene cog directory: {}'.format(cog_scene_dir))
+        logging.warning(f'Creating scene cog directory: {cog_scene_dir}')
         os.mkdir(cog_scene_dir)
+
+        # if fiji_AM:
+        #     # cog_scene_dir_east = f'{cog_scene_dir}_E'
+        #     # cog_scene_dir_west = f'{cog_scene_dir}_W'
+        #     if '_E' in cog_scene_dir:
+        #         logging.warning(f'Creating scene cog directories for am fiji: {cog_scene_dir_east} and {cog_scene_dir_west}')
+        #         os.mkdir(cog_scene_dir)
+        #         os.mkdir(cog_scene_dir_west)
+        # else:
+        #     logging.warning(f'Creating scene cog directory: {cog_scene_dir}')
+        #     os.mkdir(cog_scene_dir)
+
+
 
     des_prods = ["Gamma0_VV_db",
                  "Gamma0_VH_db",
@@ -140,13 +154,74 @@ def conv_s1scene_cogs(noncog_scene_dir, cog_scene_dir, scene_name, overwrite=Fal
     prod_paths = glob.glob(noncog_scene_dir + '*TF_TC*/*.img')  # - TO DO*****
     prod_paths = [x for x in prod_paths if os.path.basename(x)[:-4] in des_prods]
 
+    root.info(f"ALL PROD_PATHS: {prod_paths}")
+
+    # CHECK IF east or west in the prod_path
+    # if fiji_AM:
+    #     for prod in prod_paths:
+    #         root.info(f'CHECKING IF EAST OR WEST IS IN THE PROD NAME: {prod}')
+    #         if 'east' in prod:
+    #             out_filename = os.path.join(cog_scene_dir,
+    #                                 scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
+    #             logging.info(f"converting {prod} to cog at {out_filename}")
+    #             # ensure input file exists
+    #             to_cog(prod, out_filename, nodata=-9999)
+    #         elif 'west' in prod:
+    #             out_filename = os.path.join(cog_scene_dir,
+    #                                 scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
+    #             logging.info(f"converting {prod} to cog at {out_filename}")
+    #             # ensure input file exists
+    #             to_cog(prod, out_filename, nodata=-9999)    
+    #         else:
+    #             root.info(f'ERROR: the prod {prod} crosses the AM but contains neither "east" or "west"')           
+    # else:
+    #     for prod in prod_paths:
+    #         out_filename = os.path.join(cog_scene_dir,
+    #                                 scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
+    #         logging.info(f"converting {prod} to cog at {out_filename}")
+    #         # ensure input file exists
+    #         to_cog(prod, out_filename, nodata=-9999)
+
+    # REFINING THE PROD PATHS BY EAST, WEST AND NONE
+    # prod_paths_east = []
+    # prod_paths_west = []
+    # for prod in prod_paths:
+    #     if 'east' in prod:
+
+
+
     # iterate over prods to create parellel processing list
     for prod in prod_paths:
-        out_filename = os.path.join(cog_scene_dir,
+        # NEED TO ONLY GET THE PRODS WITH THE EAST FOR EAST DIR ETC
+        root.info(f'the prod is: {prod}')
+        if '_E' in cog_scene_dir and 'east' in prod: 
+            out_filename = os.path.join(cog_scene_dir,
                                     scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
-        logging.info(f"converting {prod} to cog at {out_filename}")
-        # ensure input file exists
-        to_cog(prod, out_filename, nodata=-9999)
+            logging.info(f"converting {prod} to cog at {out_filename}")
+            # ensure input file exists
+            to_cog(prod, out_filename, nodata=-9999)
+        elif '_W' in cog_scene_dir and 'west' in prod:
+            out_filename = os.path.join(cog_scene_dir,
+                                    scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
+            logging.info(f"converting {prod} to cog at {out_filename}")
+            # ensure input file exists
+            to_cog(prod, out_filename, nodata=-9999)
+        else:
+            root.info(f'prod: {prod} doesnt cross AM')
+            out_filename = os.path.join(cog_scene_dir,
+                                    scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
+            logging.info(f"converting {prod} to cog at {out_filename}")
+            # ensure input file exists
+            to_cog(prod, out_filename, nodata=-9999)
+
+
+    # # iterate over prods to create parellel processing list
+    # for prod in prod_paths:
+    #     out_filename = os.path.join(cog_scene_dir,
+    #                                 scene_name + '_' + os.path.basename(prod)[:-4] + '.tif')  # - TO DO*****
+    #     logging.info(f"converting {prod} to cog at {out_filename}")
+    #     # ensure input file exists
+    #     to_cog(prod, out_filename, nodata=-9999)
 
 def copy_s1_metadata(out_s1_prod, cog_scene_dir, scene_name):
     """
@@ -155,8 +230,14 @@ def copy_s1_metadata(out_s1_prod, cog_scene_dir, scene_name):
 
     if os.path.exists(out_s1_prod):
 
-        meta_base = os.path.basename(out_s1_prod)
-        n_meta = os.path.join(cog_scene_dir + '/' + scene_name + '_' + meta_base)
+        meta_base = os.path.basename(out_s1_prod)  # THIS IS TOO LONG FOR AM CORSSING TIFFS
+        # n_meta = os.path.join(cog_scene_dir + '/' + scene_name + '_' + meta_base)
+
+        if 'east' in out_s1_prod or 'west' in out_s1_prod:
+            n_meta = os.path.join(cog_scene_dir + '/' + meta_base)
+        else:
+            n_meta = os.path.join(cog_scene_dir + '/' + scene_name + '_' + meta_base)
+
         logging.info("Copying original metadata file to cog dir: {}".format(n_meta))
         if not os.path.exists(n_meta):
             shutil.copyfile(out_s1_prod, n_meta)
@@ -190,14 +271,46 @@ def extract_wkt_and_coordinates(manifest):
     return wkt, coordinates
 
 
-def get_s1_geometry(path):
-    manifest = read_manifest(path)
-    wkt, coordinates = extract_wkt_and_coordinates(manifest)
+def get_s1_geometry(path, hemisphere=None):
 
-    top = coordinates[2][0]
-    left = coordinates[1][1]
-    right = coordinates[3][1]
-    bottom = coordinates[0][0]
+    # needs to get the east and west coors for fiji-AM - GET coordinates and wkt
+    if hemisphere:
+        # find east vv or vh tiff to get the coors
+        # get the first tiff from the dir
+        print('S1AM')
+        print('PATH IS:', path)
+        for root, dirs, files in os.walk(path):
+            print('FILES ARE: ', files)
+            tiff_list = []
+            file_list = []
+            for file in files:
+                print('WHAT ', os.path.join(root, file))
+                file_list.append(os.path.join(root, file))
+                # print('FILE IS: ', file)
+                for file in file_list:
+                    if 'tif' in file:
+                        tiff_list.append(file)
+        print(f'TIFF LIST: {tiff_list}')
+        
+        print(f'OPENING: {tiff_list[0]}')
+        data = gdal.Open(f'{tiff_list[0]}')
+        # data = tiff_list[0]
+        print(f'DATA IS: {data}')
+        geoTransform = data.GetGeoTransform()
+        left = geoTransform[0]  # minx 
+        top = geoTransform[3]  # maxy
+        right = left + geoTransform[1] * data.RasterXSize  # maxx
+        bottom = top + geoTransform[5] * data.RasterYSize  # miny
+
+        wkt =  gdal.Dataset.GetProjection(data)# how to get wkt from east/west?
+    else:
+        # original method
+        manifest = read_manifest(path)
+        wkt, coordinates = extract_wkt_and_coordinates(manifest)
+        top = coordinates[2][0]
+        left = coordinates[1][1]
+        right = coordinates[3][1]
+        bottom = coordinates[0][0]
 
     projection = {
         'geo_ref_points': {
@@ -242,7 +355,7 @@ def get_s1_geometry(path):
     return projection, extent
 
 
-def yaml_prep_s1(scene_dir, down_dir):
+def yaml_prep_s1(scene_dir, down_dir, hemisphere=None): # hemisphere=None
     """
     Prepare individual S1 scene directory containing S1 products
     note: doesn't inc. additional ancillary products such as incidence
@@ -252,8 +365,13 @@ def yaml_prep_s1(scene_dir, down_dir):
 
     logging.info("Scene path {}".format(scene_dir))
 
-    prod_paths = discover_tiffs(scene_dir)
+    # need to only discover east and west tiffs if hemisphere exists
+    prod_paths = discover_tiffs(scene_dir, hemisphere)  # gets all the tiffs
     logging.debug(f"Found {len(prod_paths)} products")
+
+    # original method
+    # prod_paths = discover_tiffs(scene_dir)  # gets all the tiffs
+    # logging.debug(f"Found {len(prod_paths)} products")
 
     t0 = parse(str(datetime.strptime(scene_name.split("_")[-2], '%Y%m%dT%H%M%S')))
 
@@ -266,12 +384,28 @@ def yaml_prep_s1(scene_dir, down_dir):
     }
 
     # read from manifest
-    projection, extent = get_s1_geometry(down_dir)
+    if hemisphere:
+        # path is to the specific east/west tiff
+        projection, extent = get_s1_geometry(scene_dir, hemisphere=hemisphere)
+        # create id
+        short_scene_name = scene_name[:-4]
+        if hemisphere == 'east':
+            hemisphere_scene_name = short_scene_name + 'east'
+        else:
+            hemisphere_scene_name = short_scene_name + 'west'
+        
+        scene_id = str(uuid.uuid5(uuid.NAMESPACE_URL, hemisphere_scene_name))
+
+    else:
+        # oringial method
+        projection, extent = get_s1_geometry(down_dir)
+        # creating id(uuid format)
+        scene_id = str(uuid.uuid5(uuid.NAMESPACE_URL, scene_name))
 
 
     # format metadata (i.e. construct hashtable tree for syntax of file interface)
     return {
-        'id': str(uuid.uuid5(uuid.NAMESPACE_URL, scene_name)),
+        'id': str(scene_id),  # original: 'id': str(uuid.uuid5(uuid.NAMESPACE_URL, scene_name))
         'processing_level': "sac_snap_ard",
         'product_type': "gamma0",
         'creation_dt': str(datetime.today().strftime('%Y-%m-%d %H:%M:%S')),
@@ -311,8 +445,13 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
     :return: None
     """
 
+    ############ COMMENTING OUT DURING YAML TESTING
+    # print('YAML TESTING')
+    # process_start_time = datetime.now().strftime("%H:%M:%S")  
+    # print(f'prepS1AM code starting at: {process_start_time}')
+
     print(f'STARTING S1 PREP FOR {title} in {region}')
-    process_start_time = datetime.now().strftime("%H:%M:%S")
+    process_start_time = datetime.now().strftime("%H:%M:%S")  
     print(f'prepS1AM code starting at: {process_start_time}')
 
     tmp_inter_dir = inter_dir
@@ -329,12 +468,13 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
     down_zip = inter_dir + in_scene.replace('.SAFE','.zip')
     down_dir = inter_dir + in_scene + '/'
 
-    print('DOWN ZIP:', down_zip)
-    print('IN SCENE:', in_scene)
-    print('SCENE NAME:', scene_name)
+    # print('DOWN ZIP:', down_zip)
+    # print('IN SCENE:', in_scene)
+    # print('SCENE NAME:', scene_name)
 
 
-    root.info(f'download dir: {down_dir}')
+    # root.info(f'download dir: {down_dir}')
+    ########## UNCOMMENT AFTER YAML TESTING
     try:
         # Download scene from ESA
         try:
@@ -351,6 +491,7 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
         print('DOWNLOADED SCENE')
         ####### MOVE THIS INSIDE THE S1 AM CODE (NOT USED FOR NON-AM)
         # Download external DEMs
+
         ext_dem_path_list_local = download_external_dems(region, in_scene, scene_name, tmp_inter_dir, s3_bucket, root)
         print('EXT DEM PATH LIST:', ext_dem_path_list_local)  # PASS INTO PROCESS AND INSIDE PROCESS SPLIT INTO E AND W
 
@@ -359,104 +500,120 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
         # Process for AM and non-AM (if statement in raw2ard.py)
         try:
             root.info(f"{in_scene} {scene_name} Starting SNAP processing")
-            obj = Raw2Ard( chunks=chunks, gpt='/opt/snap/bin/gpt' )  # TEST PATH: gpt='/home/spatialdaysubuntu/esa_snap/bin/gpt')
+            snap_gpt = os.getenv("GPT_PATH", '/opt/snap/bin/gpt')  # TRY '/esa-snap_sentinel_unix_6_0/bin/gpt' INSTEAD OF THE OPT PATH  # '/opt/snap/bin/gpt' 
+            root.info(f'----------PATH TO SNAP GPT: {snap_gpt}')
+            obj = Raw2Ard( chunks=chunks, gpt=snap_gpt )  # TEST PATH: gpt='/home/spatialdaysubuntu/esa_snap/bin/gpt')
             print('BEGINNING PREPROCESSING')
             print('inter_dir: ', inter_dir)
             out_prods = obj.process(s3_bucket, in_scene, down_zip, inter_dir, ext_dem_path_list_local, region)
         except Exception as e:
             root.exception(e)
 
-        # print('FINISHED PREPROCESSING')
-        # print('EXITING TEST')
-        # raise SystemExit  # REMOVE AFTER TESTING!!!
-        # clean_up(inter_dir)
-        """
-        print('COG CONVERTING')
-        # Convert scene to COGs in a temporary directory
-        try:
-            root.info(f"Converting {in_scene} to COGs")
-            conv_s1scene_cogs(down_dir, cog_dir, scene_name)
-            root.info(f"Finished converting {in_scene} to COGs")
-        except Exception as e:
-            root.exception(f"Failed to convert {in_scene} to COGs")
-            raise Exception(f"COG conversion error: {e}")
 
-        print('YAML CREATING')
-        # Create YAML metadata for the COGs
-        try:
-            root.info(f"Creating dataset YAML for {in_scene}")
-            metadata = yaml_prep_s1(cog_dir, down_dir)
-            create_yaml(cog_dir, metadata)
-            root.info(f"Finished creating dataset YAML for {in_scene}")
-        except Exception as e:
-            root.exception(f"Failed to create dataset YAML for {in_scene}")
-            raise Exception(f"YAML creation error: {e}")
-
-
-        print('S3 UPLOAD')
-        # Upload COGs to S3 bucket
-        try:
-            root.info(f"Uploading {in_scene} COGs to S3 bucket")
-            cogs_to_upload = glob.glob(os.path.join(cog_dir, '*'))
-            s3_upload_cogs(cogs_to_upload, s3_bucket, s3_dir)
-            root.info(f"Finished uploading {in_scene} COGs to S3 bucket")
-        except Exception as e:
-            root.exception(f"Failed to upload {in_scene} COGs to S3 bucket")
-            raise Exception(f"S3 upload error: {e}")
-
-        """
         ##############################
 
         # checking if the process was for s1 or s1AM scene
-        if out_prods[2] == 'S1':
+        if out_prods[0] == 'S1':
+            product_type = 'S1'
             print('S1 OUT PRODUCTS')
             print(f'prepS1 code started at: {process_start_time}')
             print(f'prepS1 preprocessing for scene finished at: {datetime.now().strftime("%H:%M:%S")}')
-            out_prod1 = out_prods[0]
-            out_prod2 = out_prods[1]
+            out_prod1 = out_prods[1]
+            out_prod2 = out_prods[2]
         else:
+            product_type = 'S1AM'
             print('S1AM MOSAICS')
             print(f'prepS1AM code started at: {process_start_time}')
             print(f'prepS1AM preprocessing for AM scene finished at: {datetime.now().strftime("%H:%M:%S")}')
-            out_prod1 = out_prods[0]  # vv mosaic
-            out_prod2 = out_prods[1]  # vh mosaic
-            print(f'outprod[0]: {out_prods[0]}')
-            print(f'outprod[1]: {out_prods[1]}')
-            print('FINISHED PREPROCESSING')
-            print('EXITING TEST')
-            raise SystemExit  # REMOVE AFTER TESTING!!!
+            out_prod1 = out_prods[1]  # vv EAST mosaic
+            out_prod2 = out_prods[2]  # vh EAST mosaic
+            out_prod3 = out_prods[3]  # vv WEST mosaic
+            out_prod4 = out_prods[4]  # vh WEST mosaic
+            print(f'out_prod1: {out_prod1}')
+            print(f'out_prod2: {out_prod2}')
+            print(f'out_prod3: {out_prod3}')
+            print(f'out_prod4: {out_prod4}')
+            # creating alternate cog dir paths
+            cog_dir_east = f'{cog_dir}_E'
+            cog_dir_west = f'{cog_dir}_W'
 
 
-        print('COG CONVERTING')
+        ######## FOR YAML TESTING, TRY TO RUN JUST FROM HERE - COMMENTING OUT THE ABOVE
+        # product_type = 'S1AM'
+        # cog_dir_east = f'{cog_dir}_E'
+        # cog_dir_west = f'{cog_dir}_W'
+        #############
+
+        root.info('COG CONVERTING')
         try:
-            root.info(f"{in_scene} {scene_name} Converting COGs")
-            conv_s1scene_cogs(inter_dir, cog_dir, scene_name)
-            root.info(f"{in_scene} {scene_name} COGGED")
+            # root.info(f"{in_scene} {scene_name} Converting COGs")
+            # conv_s1scene_cogs(inter_dir, cog_dir, scene_name)
+            # root.info(f"{in_scene} {scene_name} COGGED")
+
+            if product_type == 'S1AM':
+                # cog_scene_dir_east, cog_scene_dir_west
+                root.info(f"Fiji-AM Converting COGs - with cog dir: {cog_dir}")
+                conv_s1scene_cogs(inter_dir, cog_dir_east, scene_name, fiji_AM=True)  # need to split into E and W if fiji-AM
+                conv_s1scene_cogs(inter_dir, cog_dir_west, scene_name, fiji_AM=True)
+                root.info("Fiji-AM scene COGGED")
+            else:
+                root.info(f"{in_scene} {scene_name} Converting COGs")
+                conv_s1scene_cogs(inter_dir, cog_dir, scene_name)
+                root.info(f"{in_scene} {scene_name} COGGED")
+
+
         except Exception as e:
             root.exception(f"{in_scene} {scene_name} COG conversion FAILED")
             raise Exception('COG Error', e)
 
             # PARSE METADATA TO TEMP COG DIRECTORY**
-        print('PARSE METADATA TO TEMP COG DIRECTORY')
+        root.info('PARSE METADATA TO TEMP COG DIRECTORY')
         try:
             root.info(f"{in_scene} {scene_name} Copying original METADATA")
-            copy_s1_metadata(out_prod1, cog_dir, scene_name)
-            copy_s1_metadata(out_prod2, cog_dir, scene_name)
+            if product_type == 'S1AM':
+                root.info('COPYING METADATA FOR S1AM')
+                copy_s1_metadata(out_prod1, cog_dir_east, scene_name)
+                copy_s1_metadata(out_prod2, cog_dir_east, scene_name)
+                copy_s1_metadata(out_prod3, cog_dir_west, scene_name)
+                copy_s1_metadata(out_prod4, cog_dir_west, scene_name)
+            else:
+                root.info('COPYING METADATA FOR S1')
+                copy_s1_metadata(out_prod1, cog_dir, scene_name)
+                copy_s1_metadata(out_prod2, cog_dir, scene_name)
+
+            # ORIGINAL METHOD
+            # copy_s1_metadata(out_prod1, cog_dir, scene_name)
+            # copy_s1_metadata(out_prod2, cog_dir, scene_name)
+            # # four products in totoal for Am crossing imagery
+            # if product_type == 'S1AM':
+            #     copy_s1_metadata(out_prod3, cog_dir, scene_name)
+            #     copy_s1_metadata(out_prod4, cog_dir, scene_name)
+
             root.info(f"{in_scene} {scene_name} COPIED original METADATA")
         except Exception as e:
             root.exception(f"{in_scene} {scene_name} MTD not coppied")
             raise e
         
-        # print('FINISHED PREPROCESSING')
-        # print('EXITING TEST')
-        # raise SystemExit  # REMOVE AFTER TESTING!!!
+        ######## UNCOMMENT AFTER YAML TESTING
 
         # GENERATE YAML WITHIN TEMP COG DIRECTORY**
         print('GENERATE YAML WITHIN TEMP COG DIRECTORY')
         try:
-            root.info(f"{in_scene} {scene_name} Creating dataset YAML")
-            create_yaml(cog_dir, yaml_prep_s1(cog_dir, down_dir))
-            root.info(f"{in_scene} {scene_name} Created original METADATA")
+            # original method
+            # root.info(f"{in_scene} {scene_name} Creating dataset YAML")
+            # create_yaml(cog_dir, yaml_prep_s1(cog_dir, down_dir))
+            # root.info(f"{in_scene} {scene_name} Created original METADATA")
+
+            if product_type == 'S1AM':
+                root.info('Creating yamls for fiji East and West')
+                create_yaml(cog_dir_east, yaml_prep_s1(cog_dir_east, down_dir, hemisphere='east'))  # creating yaml for east 
+                create_yaml(cog_dir_west, yaml_prep_s1(cog_dir_west, down_dir, hemisphere='west'))  # creating yaml for west
+                root.info('Yamls for fiji East and West have been created')
+            else:
+                root.info(f"{in_scene} {scene_name} Creating dataset YAML")
+                create_yaml(cog_dir, yaml_prep_s1(cog_dir, down_dir))  # for all scenes that arent AM fiji 
+                root.info(f"{in_scene} {scene_name} Created original METADATA")
+
         except Exception as e:
             root.exception(f"{in_scene} {scene_name} Dataset YAML not created")
             raise Exception('YAML creation error', e)
@@ -465,7 +622,16 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
         print('MOVE COG DIRECTORY TO OUTPUT DIRECTORY')
         try:
             root.info(f"{in_scene} {scene_name} Uploading to S3 Bucket")
-            s3_upload_cogs(glob.glob(os.path.join(cog_dir, '*')), s3_bucket, s3_dir)
+            if product_type == 'S1AM':
+                root.info('Uploading fiji AM EAST scene to S3 Bucket')
+                s3_upload_cogs(glob.glob(os.path.join(cog_dir_east, '*')), s3_bucket, s3_dir)
+                root.info('Uploading fiji AM WEST scene to S3 Bucket')
+                s3_upload_cogs(glob.glob(os.path.join(cog_dir_west, '*')), s3_bucket, s3_dir)
+            else:
+                s3_upload_cogs(glob.glob(os.path.join(cog_dir, '*')), s3_bucket, s3_dir)
+
+            # original method
+            # s3_upload_cogs(glob.glob(os.path.join(cog_dir, '*')), s3_bucket, s3_dir)
             root.info(f"{in_scene} {scene_name} Uploaded to S3 Bucket")
         except Exception as e:
             root.exception(f"{in_scene} {scene_name} Upload to S3 Failed")
@@ -474,15 +640,18 @@ def prepare_S1AM(title, region, chunks=24,s3_bucket='public-eo-data', s3_dir='co
     except Exception as e:
         logging.error(f"could not process {scene_name} {e}")
     finally:
-        # logging.info(f"finished without clean up")  # FOR TESTING
-        logging.info(f"cleaning up {inter_dir}")
-        clean_up(inter_dir)
+        test_env = os.getenv('TEST_ENV', False)
+        if test_env:
+            logging.info(f"finished without clean up")  # FOR TESTING
+        else:
+            logging.info(f"cleaning up {inter_dir}")
+            clean_up(inter_dir)
 
 
 if __name__ == '__main__':
-    prepare_S1AM('S1A_IW_GRDH_1SDV_20170328T063214_20170328T063226_015888_01A309_0E7F', 'Fiji',s3_bucket = "ard-bucket")
+    prepare_S1AM('S1A_IW_GRDH_1SDV_20170724T174037_20170724T174100_017616_01D7A7_F0DA', 'fiji',s3_bucket = "ard-bucket")
 
-    # region vars: 'Solomon', 'Fiji', 'Vanuatu' ('default' or any other value for snap default dem)
+    # region vars: 'solomon', 'fiji', 'vanuatu' ('default' or any other value for snap default dem)
 
     # non-AM test: S1A_IW_GRDH_1SDV_20230118T174108_20230118T174131_046841_059DD6_8B3D
     # AM test: S1A_IW_GRDH_1SDV_20230218T173255_20230218T173312_047293_05AD04_C398
