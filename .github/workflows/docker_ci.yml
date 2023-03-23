@@ -37,7 +37,7 @@ jobs:
           context: ./
           file: Dockerfile
           cache-from: type=registry,ref=ivicamaticsd/catapult-ard-docker-images-build-cache .
-          cache-to: type=registry, ref=ivicamaticsd/catapult-ard-docker-images-build-cache
+          cache-to: type=registry,ref=ivicamaticsd/catapult-ard-docker-images-build-cache
           push: true
           tags: ivicamaticsd/catapult-ard-docker-images:${{ env.BRANCH_NAME }}
 
