@@ -18,6 +18,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+import logging
 
 import numpy as np
 import xarray as xr
@@ -31,6 +32,7 @@ from .dc_utilities import create_default_clean_mask
 Utility Functions
 """
 
+
 def convert_to_dtype(data, dtype):
     """
     A utility function converting xarray, pandas, or NumPy data to a given dtype.
@@ -43,7 +45,7 @@ def convert_to_dtype(data, dtype):
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
         np.int16, np.float32) to convert the data to.
     """
-    if dtype is None: # Don't convert the data type.
+    if dtype is None:  # Don't convert the data type.
         return data
     return data.astype(dtype)
 
@@ -51,6 +53,7 @@ def convert_to_dtype(data, dtype):
 """
 Compositing Functions
 """
+
 
 def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, intermediate_product=None, **kwargs):
     """
@@ -117,6 +120,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, interm
     # Handle datatype conversions.
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
+
 
 def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, **kwargs):
     """
@@ -344,6 +348,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     dataset_out = restore_or_convert_dtypes(dtype, None, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
+
 def unpack_bits(land_cover_endcoding, data_array, cover_type):
     """
 	Description:
@@ -356,47 +361,50 @@ def unpack_bits(land_cover_endcoding, data_array, cover_type):
 	Output:
         unpacked DataArray
 	"""
-    boolean_mask = np.isin(data_array.values, land_cover_endcoding[cover_type]) 
+    boolean_mask = np.isin(data_array.values, land_cover_endcoding[cover_type])
     return xr.DataArray(boolean_mask.astype(bool),
-                        coords = data_array.coords,
-                        dims = data_array.dims,
-                        name = cover_type + "_mask",
-                        attrs = data_array.attrs)
+                        coords=data_array.coords,
+                        dims=data_array.dims,
+                        name=cover_type + "_mask",
+                        attrs=data_array.attrs)
 
-def ls8_unpack_qa( data_array , cover_type):
-    print("Applying ls8_unpack_qa")
-    # TODO: This is only for cover_type = 'water'
-    # make empty numpy array with same shape as data_array
+
+def ls8_unpack_qa(data_array, cover_type):
+    logging.info(f"Apply {cover_type} mask for Landsat 8")
     boolean_mask = np.zeros(data_array.shape, dtype=bool)
-    boolean_mask |= (data_array & 0b110000) != 0
+    if cover_type == 'clear':
+        # make a boolean mask have true values only where  the 6th bit is 1, other bits can be whatever
+        boolean_mask |= (data_array & 0b1000000) != 0
+    elif cover_type == 'water':
+        # make a boolean mask have true values only where the 7th bit is 1, other bits can be whatever
+        boolean_mask |= (data_array & 0b10000000) != 0
+    else:
+        raise ValueError(f"Cover type {cover_type} not supported for Landsat 8 yet")
 
-    boolean_mask = ~boolean_mask
-
-    # combine the two masks
+    logging.info(f"Applied {cover_type} mask for Landsat 8")
     return xr.DataArray(boolean_mask.astype(bool),
-                        coords = data_array.coords,
-                        dims = data_array.dims,
-                        name = cover_type + "_mask",
-                        attrs = data_array.attrs)
+                        coords=data_array.coords,
+                        dims=data_array.dims,
+                        name=cover_type + "_mask",
+                        attrs=data_array.attrs)
 
 
-
-def sen2_unpack_qa( data_array , cover_type):
+def sen2_unpack_qa(data_array, cover_type):
     print('trying to unpack')
-    land_cover_endcoding = dict( fill         =[0, 1] ,
-                                 clear        =[4, 5, 7, 2],
-                                 water        =[6],
-                                 shadow       =[3],
-                                 snow         =[11],
-                                 cloud        =[8, 9, 10],
-                                 low_conf_cl  =[8],
-                                 med_conf_cl  =[9],
-                                 high_conf_cl =[9],
-                                 low_conf_cir =[10],
-                                 high_conf_cir=[10],
-                                 terrain_occ  =[]
-                               )
-    return unpack_bits(land_cover_endcoding, data_array, cover_type)    
+    land_cover_endcoding = dict(fill=[0, 1],
+                                clear=[4, 5, 7, 2],
+                                water=[6],
+                                shadow=[3],
+                                snow=[11],
+                                cloud=[8, 9, 10],
+                                low_conf_cl=[8],
+                                med_conf_cl=[9],
+                                high_conf_cl=[9],
+                                low_conf_cir=[10],
+                                high_conf_cir=[10],
+                                terrain_occ=[]
+                                )
+    return unpack_bits(land_cover_endcoding, data_array, cover_type)
 
 
 def ls8_oli_unpack_qa(data_array, cover_type):
@@ -444,64 +452,77 @@ def ls8_oli_unpack_qa(data_array, cover_type):
         are of the selected `cover_type` (True indicates presence and
         False indicates absence). This will have the same dimensions and coordinates as `data_array`.
     """
-    land_cover_encoding = dict(fill         =[1],
-                               terrain_occ  =[2, 2722],
-                               clear        =[2720, 2724, 2728, 2732],
-                               rad_sat_1_2  =[2724, 2756, 2804, 2980, 3012, 3748, 3780, 6820, 6852, 6900, 7076, 7108, 7844, 7876],
-                               rad_sat_3_4  =[2728, 2760, 2808, 2984, 3016, 3752, 3784, 6824, 6856, 6904, 7080, 7112, 7848, 7880],
-                               rad_sat_5_pls=[2732, 2764, 2812, 2988, 3020, 3756, 3788, 6828, 6860, 6908, 7084, 7116, 7852, 7884],
-                               cloud        =[2800, 2804, 2808, 2812, 6896, 6900, 6904, 6908],
-                               low_conf_cl  =[2752, 2722, 2724, 2728, 2732, 2976, 2980, 2984, 2988, 3744, 3748, 3752, 3756, 6816, 6820, 6824, 6828, 7072, 7076, 7080, 7084, 7840, 7844, 7848, 7852],
-                               med_conf_cl  =[2752, 2756, 2760, 2764, 3008, 3012, 3016, 3020, 3776, 3780, 3784, 3788, 6848, 6852, 6856, 6860, 7104, 7108, 7112, 7116, 7872, 7876, 7880, 7884],
-                               high_conf_cl =[2800, 2804, 2808, 2812, 6896, 6900, 6904, 6908],
-                               high_cl_shdw=[2976, 2980, 2984, 2988, 3008, 3012, 3016, 3020, 7072, 7076, 7080, 7084, 7104, 7108, 7112, 7116],
-                               high_snow_ice=[3744, 3748, 3752, 3756, 3776, 3780, 3784, 3788, 7840, 7844, 7848, 7852, 7872, 7876, 7880, 7884],
-                               low_conf_cir =[2720, 2722, 2724, 2728, 2732, 2752, 2756, 2760, 2764, 2800, 2804, 2808, 2812, 2976, 2980, 2984, 2988, 3008, 3012, 3016, 3020, 3744, 3748, 3752, 3756, 3780, 3784, 3788],
-                               high_conf_cir=[6816, 6820, 6824, 6828, 6848, 6852, 6856, 6860, 6896, 6900, 6904, 6908, 7072, 7076, 7080, 7084, 7104, 7108, 7112, 7116, 7840, 7844, 7848, 7852, 7872, 7876, 7880, 7884]
+    land_cover_encoding = dict(fill=[1],
+                               terrain_occ=[2, 2722],
+                               clear=[2720, 2724, 2728, 2732],
+                               rad_sat_1_2=[2724, 2756, 2804, 2980, 3012, 3748, 3780, 6820, 6852, 6900, 7076, 7108,
+                                            7844, 7876],
+                               rad_sat_3_4=[2728, 2760, 2808, 2984, 3016, 3752, 3784, 6824, 6856, 6904, 7080, 7112,
+                                            7848, 7880],
+                               rad_sat_5_pls=[2732, 2764, 2812, 2988, 3020, 3756, 3788, 6828, 6860, 6908, 7084, 7116,
+                                              7852, 7884],
+                               cloud=[2800, 2804, 2808, 2812, 6896, 6900, 6904, 6908],
+                               low_conf_cl=[2752, 2722, 2724, 2728, 2732, 2976, 2980, 2984, 2988, 3744, 3748, 3752,
+                                            3756, 6816, 6820, 6824, 6828, 7072, 7076, 7080, 7084, 7840, 7844, 7848,
+                                            7852],
+                               med_conf_cl=[2752, 2756, 2760, 2764, 3008, 3012, 3016, 3020, 3776, 3780, 3784, 3788,
+                                            6848, 6852, 6856, 6860, 7104, 7108, 7112, 7116, 7872, 7876, 7880, 7884],
+                               high_conf_cl=[2800, 2804, 2808, 2812, 6896, 6900, 6904, 6908],
+                               high_cl_shdw=[2976, 2980, 2984, 2988, 3008, 3012, 3016, 3020, 7072, 7076, 7080, 7084,
+                                             7104, 7108, 7112, 7116],
+                               high_snow_ice=[3744, 3748, 3752, 3756, 3776, 3780, 3784, 3788, 7840, 7844, 7848, 7852,
+                                              7872, 7876, 7880, 7884],
+                               low_conf_cir=[2720, 2722, 2724, 2728, 2732, 2752, 2756, 2760, 2764, 2800, 2804, 2808,
+                                             2812, 2976, 2980, 2984, 2988, 3008, 3012, 3016, 3020, 3744, 3748, 3752,
+                                             3756, 3780, 3784, 3788],
+                               high_conf_cir=[6816, 6820, 6824, 6828, 6848, 6852, 6856, 6860, 6896, 6900, 6904, 6908,
+                                              7072, 7076, 7080, 7084, 7104, 7108, 7112, 7116, 7840, 7844, 7848, 7852,
+                                              7872, 7876, 7880, 7884]
                                )
     return unpack_bits(land_cover_encoding, data_array, cover_type)
 
-def ls7_unpack_qa( data_array , cover_type):
 
-    land_cover_endcoding = dict( fill     =  [1],
-                                 clear    =  [66,  130],
-                                 water    =  [68,  132],
-                                 shadow   =  [72,  136],
-                                 snow     =  [80,  112, 144, 176],
-                                 cloud    =  [96,  112, 160, 176, 224],
-                                 low_conf =  [66,  68,  72,  80,  96,  112],
-                                 med_conf =  [130, 132, 136, 144, 160, 176],
-                                 high_conf=  [224]
-                               )
+def ls7_unpack_qa(data_array, cover_type):
+    land_cover_endcoding = dict(fill=[1],
+                                clear=[66, 130],
+                                water=[68, 132],
+                                shadow=[72, 136],
+                                snow=[80, 112, 144, 176],
+                                cloud=[96, 112, 160, 176, 224],
+                                low_conf=[66, 68, 72, 80, 96, 112],
+                                med_conf=[130, 132, 136, 144, 160, 176],
+                                high_conf=[224]
+                                )
     return unpack_bits(land_cover_endcoding, data_array, cover_type)
 
-def ls5_unpack_qa( data_array , cover_type):
 
-    land_cover_endcoding = dict( fill     =  [1],
-                                 clear    =  [66,  130],
-                                 water    =  [68,  132],
-                                 shadow   =  [72,  136],
-                                 snow     =  [80,  112, 144, 176],
-                                 cloud    =  [96,  112, 160, 176, 224],
-                                 low_conf =  [66,  68,  72,  80,  96,  112],
-                                 med_conf =  [130, 132, 136, 144, 160, 176],
-                                 high_conf=  [224]
-                               )
+def ls5_unpack_qa(data_array, cover_type):
+    land_cover_endcoding = dict(fill=[1],
+                                clear=[66, 130],
+                                water=[68, 132],
+                                shadow=[72, 136],
+                                snow=[80, 112, 144, 176],
+                                cloud=[96, 112, 160, 176, 224],
+                                low_conf=[66, 68, 72, 80, 96, 112],
+                                med_conf=[130, 132, 136, 144, 160, 176],
+                                high_conf=[224]
+                                )
     return unpack_bits(land_cover_endcoding, data_array, cover_type)
 
-def ls4_unpack_qa( data_array , cover_type):
 
-    land_cover_endcoding = dict( fill     =  [1],
-                                 clear    =  [66,  130],
-                                 water    =  [68,  132],
-                                 shadow   =  [72,  136],
-                                 snow     =  [80,  112, 144, 176],
-                                 cloud    =  [96,  112, 160, 176, 224],
-                                 low_conf =  [66,  68,  72,  80,  96,  112],
-                                 med_conf =  [130, 132, 136, 144, 160, 176],
-                                 high_conf=  [224]
-                               )
+def ls4_unpack_qa(data_array, cover_type):
+    land_cover_endcoding = dict(fill=[1],
+                                clear=[66, 130],
+                                water=[68, 132],
+                                shadow=[72, 136],
+                                snow=[80, 112, 144, 176],
+                                cloud=[96, 112, 160, 176, 224],
+                                low_conf=[66, 68, 72, 80, 96, 112],
+                                med_conf=[130, 132, 136, 144, 160, 176],
+                                high_conf=[224]
+                                )
     return unpack_bits(land_cover_endcoding, data_array, cover_type)
+
 
 def create_hdmedians_multiple_band_mosaic(dataset_in,
                                           clean_mask=None,
@@ -583,7 +604,9 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
-def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dtypes=None, dataset_out=None, no_data=-9999):
+
+def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dtypes=None, dataset_out=None,
+                              no_data=-9999):
     """
     Converts datatypes of data variables in a copy of an xarray Dataset.
 
@@ -609,7 +632,7 @@ def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dty
         "One of `dtype_for_all` or `dataset_in_dtypes` must be `None`."
     if dtype_for_all is not None:
         # Integer types can't represent nan.
-        if np.issubdtype(dtype_for_all, np.integer): # This also works for Python int type.
+        if np.issubdtype(dtype_for_all, np.integer):  # This also works for Python int type.
             utilities.nan_to_num(dataset_out, no_data)
         convert_to_dtype(dataset_out, dtype_for_all)
     else:  # Restore dtypes to state before masking.
