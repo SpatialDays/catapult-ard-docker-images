@@ -229,8 +229,12 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
             o_bands_data = [ resamp_bands(i, o_bands_data) for i in o_bands_data ]
             bands_data = xr.merge([rename_bands(bd, des_bands, i) for i,bd in enumerate(o_bands_data)]).rename({'band': 'time'}) # ensure band names & dims consistent
             bands_data = bands_data.assign_attrs(o_bands_data[0].attrs) # crs etc. needed later
+            for i in o_bands_data: i.close()
+            o_bands_data = None
             bands_data['time'] = [datetime.strptime(yml_meta['extent']['center_dt'], '%Y-%m-%d %H:%M:%S')] # time dim needed for wofs
             root.info(f"{scene_name} Loaded & Reformatted bands")
+            # log number of bands loaded
+            root.info(f"{scene_name} Loaded {len(bands_data.data_vars)} bands")
         except:
             root.exception(f"{scene_name} Band data not loaded properly")
             raise Exception('Data formatting error')
@@ -284,6 +288,7 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
                 water_classes = water_classes.where(clearsky_masks).where(mask) # re-apply nan mask to differentiate no-water from no-data
                 print('mask worked')
             else:
+                logger.info(f"Applying the clearsky mask for {satellite} again")
                 water_classes = water_classes.where(clearsky_masks) # re-apply nan mask to differentiate no-water from no-data
             water_classes = water_classes.fillna(-9999) # -9999 
             water_classes = water_classes.squeeze('time') # can't write geotif with time dim
@@ -328,7 +333,6 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
             raise Exception('S3  upload error')
 
 
-        for i in o_bands_data: i.close()
         bands_data.close()
         clearsky_masks.close()
         clearsky_scenes.close()
