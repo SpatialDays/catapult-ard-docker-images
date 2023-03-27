@@ -22,7 +22,8 @@ from workflows.utils.dc_clean_mask import landsat_qa_clean_mask
 from workflows.utils.prep_utils import *
 from workflows.utils.dc_import_export import export_xarray_to_geotiff
 
-
+import logging
+logger = logging.getLogger(__name__)
     
 def rename_bands(in_xr, des_bands, position):
     in_xr.name = des_bands[position]
@@ -239,6 +240,7 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
             # if landsat in satellite:
             if 'LANDSAT' in satellite:
                 clearsky_masks = landsat_qa_clean_mask(bands_data, satellite) # easy amendment in this function to inc. sentinel-2...?
+                logger.info(f"Got the clearsky mask for {satellite}")
             elif 'SENTINEL_2' in satellite:
                 clearsky_masks = (
                     (bands_data.scene_classification == 2) | # DARK_AREA_PIXELS
@@ -252,7 +254,10 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
             # elif sentinel-1 in satellite:
 #             clearsky_masks = landsat_qa_clean_mask(bands_data, satellite) # easy amendment in this function to inc. sentinel-2...?
             
-            clearsky_scenes = bands_data.where(clearsky_masks)
+
+            logger.info(f"Starting to apply the clearsky mask for {satellite}")
+            clearsky_scenes = bands_data.where(clearsky_masks) # !!!this consumes a lot of memory!!!
+            logger.info(f"Applied the clearsky mask for {satellite}")
 #             if satellite == 'SENTINEL_2':
 #                 clearsky_scenes = clearsky_scenes.rename_vars({'swir_1': 'swir1', 'swir_2': 'swir2'})
             root.info(f"{scene_name} Loading & Reformatting bands")
