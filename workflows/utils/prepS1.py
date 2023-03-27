@@ -10,9 +10,14 @@ from http.cookiejar import MozillaCookieJar
 from urllib.request import Request, HTTPHandler, HTTPSHandler, HTTPCookieProcessor, build_opener
 from urllib.error import HTTPError
 import uuid
+import base64
 from sentinelsat import SentinelAPI
 
-from utils.prep_utils import *
+from workflows.utils.prep_utils import *
+# from utils.prep_utils import *
+
+COPERNICUS_USERNAME = 'richardewell1'  # 'ivica.matic'  # mountaincharlie # 
+COPERNICUS_PWD = 'COPEbutterfly01!'  # '9JEidrgBnsifjKyD'  # gJukCV67jstc@ #
 
 cookie_jar_path = os.path.join(os.path.expanduser('~'), ".bulk_download_cookiejar.txt")
 cookie_jar = MozillaCookieJar()
@@ -171,8 +176,8 @@ def find_s1_uuid(s1_filename):
     :param s2_file_name: Sentinel-2 scene name
     :return s2_uuid: download id
     """
-    copernicus_username = os.getenv("COPERNICUS_USERNAME")
-    copernicus_pwd = os.getenv("COPERNICUS_PWD")
+    copernicus_username = os.getenv("COPERNICUS_USERNAME", COPERNICUS_USERNAME)
+    copernicus_pwd = os.getenv("COPERNICUS_PWD", COPERNICUS_PWD)
     logging.debug(f"ESA username: {copernicus_username}")
     esa_api = SentinelAPI(copernicus_username, copernicus_pwd)
 
@@ -200,8 +205,8 @@ def download_extract_s1_esa(scene_uuid, down_dir, original_scene_dir):
         if not os.path.exists(original_scene_dir.replace('.SAFE/', '.zip')):
             logging.info('Downloading ESA scene zip: {}'.format(os.path.basename(original_scene_dir)))
 
-            copernicus_username = os.getenv("COPERNICUS_USERNAME")
-            copernicus_pwd = os.getenv("COPERNICUS_PWD")
+            copernicus_username = os.getenv("COPERNICUS_USERNAME", COPERNICUS_USERNAME)
+            copernicus_pwd = os.getenv("COPERNICUS_PWD", COPERNICUS_PWD)
             logging.debug(f"ESA username: {copernicus_username}")
             esa_api = SentinelAPI(copernicus_username, copernicus_pwd)
             esa_api.download(scene_uuid, down_dir, checksum=True)
@@ -228,14 +233,27 @@ def band_name_s1(prod_path):
 
     prod_name = str(prod_path.split('/')[-1])
 
-    if 'Gamma0_VH' in str(prod_name):
+    # if 'Gamma0_VH' in str(prod_name):
+    #     print('vh found')
+    #     return 'vh'
+    # if 'Gamma0_VV' in str(prod_name):
+    #     print('vv found')
+    #     return 'vv'
+    # if 'LayoverShadow_MASK' in str(prod_name):
+    #     return 'layovershadow_mask'
+    
+    if 'vh' in str(prod_name):
+        print('vh found')
         return 'vh'
-    if 'Gamma0_VV' in str(prod_name):
+    if 'vv' in str(prod_name):
+        print('vv found')
         return 'vv'
-    if 'LayoverShadow_MASK' in str(prod_name):
+    if 'layovershadow_mask' in str(prod_name):
         return 'layovershadow_mask'
 
     logging.error(f"could not find band name for {prod_path}")
+
+    print('none found found')
 
     return 'unknown layer'
 
@@ -298,7 +316,14 @@ def yaml_prep_s1(scene_dir):
     logging.info("Preparing scene {}".format(scene_name))
     logging.info("Scene path {}".format(scene_dir))
 
-    prod_paths = glob.glob(os.path.join(scene_dir, '*.tif'))
+    # lowercase_scene_dir = scene_dir.lower()
+    scene_dir_path = scene_dir + '/measurement/'  # os.path.join(scene_dir, '/measurement/*.tif')
+    print('SCENE DIR:', scene_dir_path)
+    # prod_paths = glob.glob(os.path.join(scene_dir_path, '*.tiff'))  # old method
+    prod_paths = discover_tiffs(scene_dir_path)  # using James' function
+
+
+    print('PROD PATHS:', prod_paths)
 
     logging.info(f"prod_path: {prod_paths}, scene_name: {scene_name}")
     t0 = parse(str(datetime.strptime(scene_name.split("_")[-2], '%Y%m%dT%H%M%S')))
@@ -307,7 +332,7 @@ def yaml_prep_s1(scene_dir):
     # should be replaced with a more concise, generalisable parsing
     images = {
         band_name_s1(prod_path): {
-            'path': os.path.split(prod_path)[-1]
+            'path': prod_path  # os.path.split(prod_path)[-1]
         } for prod_path in prod_paths
     }
     logging.debug(images)
@@ -404,7 +429,11 @@ def prepareS1(
     # Unique inter_dir needed for clean-up
     inter_dir = inter_dir + scene_name + '_tmp/'
     # sub-dirs used only for accessing tmp files
-    cog_dir = os.path.join(inter_dir, scene_name)
+    # cog_dir = os.path.join(inter_dir, scene_name)
+    cog_dir = os.path.join(inter_dir, in_scene)
+
+    print('COG DIR')
+    print(cog_dir)
     os.makedirs(cog_dir, exist_ok=True)
     # s1-specific relative inputs
     input_mani = inter_dir + in_scene + '/manifest.safe'
@@ -418,13 +447,13 @@ def prepareS1(
     out_dir2 = out_prod2[:-4] + '.data/'
     down_dir = inter_dir + in_scene + '/'
     
-    snap_gpt = os.environ['SNAP_GPT']
-    int_graph_1 = os.environ['S1_PROCESS_P1A']  # ENV VAR
+    snap_gpt = '/home/spatialdaysubuntu/esa_snap/bin/gpt'  # os.environ['SNAP_GPT']  # ENV VAR
+    int_graph_1 = 'workflows/utils/cs_s1_pt1_bnr_Orb_Cal_ML.xml'  # os.environ['S1_PROCESS_P1A']  # ENV VAR
     if ext_dem:
         ext_dem_path = inter_dir + 'ext_dem.tif'
-        int_graph_2 = os.environ['S1_PROCESS_P2A']  # ENV VAR
-        int_graph_3 = os.environ['S1_PROCESS_P3A']  # ENV VAR
-        int_graph_4 = os.environ['S1_PROCESS_P4A']  # ENV VAR
+        int_graph_2 = 'workflows/utils/cs_s1_pt2A_TF.xml'  # os.environ['S1_PROCESS_P2A']  # ENV VAR
+        int_graph_3 = 'workflows/utils/cs_s1_pt3A_TC_db.xml'  # os.environ['S1_PROCESS_P3A']  # ENV VAR
+        int_graph_4 = 'workflows/utils/cs_s1_pt4A_Sm_Bm_TC_lsm.xml'  # os.environ['S1_PROCESS_P4A', ]  # ENV VAR
 
     root = setup_logging()
     root.info('{} {} Starting'.format(in_scene, scene_name))
@@ -435,7 +464,7 @@ def prepareS1(
         try:
             root.info(f"{in_scene} {scene_name} DOWNLOADING via ASF")
             download_extract_s1_scene_asf(in_scene, inter_dir)
-#             raise Exception('skipping asf for testing')
+            #             raise Exception('skipping asf for testing')
             root.info(f"{in_scene} {scene_name} DOWNLOADED via ASF")
         except Exception as e:
             root.exception(e)
@@ -489,6 +518,7 @@ def prepareS1(
                     f"-Poutput_db={out_prod1}",
                     f"-Psource_bands={create_source_bands(bands)}"
                 ]
+
                 root.info(cmd)
                 run_snap_command(cmd)
                 root.info(f"{in_scene} {scene_name} PROCESSED to dB starting PT4")
@@ -500,6 +530,7 @@ def prepareS1(
                     f"-Pext_dem={ext_dem_path}",
                     f"-Poutput_ls={out_prod2}"
                 ]
+                
                 root.info(cmd)
                 run_snap_command(cmd)
                 root.info(f"{in_scene} {scene_name} PROCESSED to lsm starting COG conversion")
@@ -546,11 +577,15 @@ def prepareS1(
         clean_up(inter_dir)
 
     except Exception as e:
-        logging.error(f"could not process {scene_name} {e}")
+        logging.critical(e, exc_info=True) 
         print('boo')
-        clean_up(inter_dir)
+        print(inter_dir)
+        # clean_up(inter_dir)
 
 
 if __name__ == '__main__':
-    prepareS1('S1A_IW_GRDH_1SDV_20191001T064008_20191001T064044_029261_035324_C74C',
-              s3_dir='fiji/Sentinel_1_dockertest/', inter_dir='../S1_ARD/')
+    prepareS1('S1A_IW_GRDH_1SDV_20230118T174108_20230118T174131_046841_059DD6_8B3D',
+              s3_dir='fiji/Sentinel_1_dockertest/')  #, inter_dir='../S1_ARD/'
+    # non-AM test: S1A_IW_GRDH_1SDV_20230118T174108_20230118T174131_046841_059DD6_8B3D
+    # other non-AM test: S1A_IW_GRDH_1SDV_20191001T064008_20191001T064044_029261_035324_C74C
+    # AM test: S1A_IW_GRDH_1SDV_20230218T173255_20230218T173312_047293_05AD04_C398

@@ -3,12 +3,15 @@ import re
 import sys
 import math
 import copy
+from copy import deepcopy
 import shutil
 import xmltodict
 import logging
 
 from . import metadata
 from . import utility
+
+from workflows.utils.prep_utils import *
 
 from osgeo import gdal
 from pathlib import Path
@@ -18,6 +21,8 @@ from . densifygrid import DensifyGrid
 
 import pdb
 
+root = setup_logging()
+
 class Raw2Ard:
 
     def __init__( self, chunks=6, gpt='/opt/snap/bin/gpt' ):
@@ -26,12 +31,7 @@ class Raw2Ard:
         constructor function
         """
 
-        # get xml schema
-#         with open ( './s1am/recipes/base.xml' ) as fd: # make var path
-#             self._base = xmltodict.parse( fd.read() )
-
-#         with open ( os.getenv( 'S1_PROCESS_P1A' ) ) as fd: # make var path
-        with open ( '/app/workflows/utils/s1am/recipes/cs_base.xml' ) as fd: # make var path
+        with open ( 'workflows/utils/s1am/recipes/cs_base.xml' ) as fd:
             self._pt1 = xmltodict.parse( fd.read() )
 
         self._densify = DensifyGrid()
@@ -43,48 +43,100 @@ class Raw2Ard:
         return
 
 
-    def process ( self, scene, out_path, E_DEM, W_DEM, args=None  ):
+    def create_source_bands(self, bands):
+        result = ""
+        for x in bands:
+            result = result + "Gamma0_" + x.upper() + ","
+
+        print(f'CREATED SOURCE BANDS: {result[:-1]}')
+        return result[:-1]  # takes the last comma off the end
+
+
+    def create_selected_polarisations(self, bands):
+        result = ""
+        for x in bands:
+            result = result + x.upper() + ", "
+        
+        print('CREATED SELECTED POLS:', result[:-2])
+
+        return result[:-2]  # takes the last comma off the end
+
+
+    def available_bands(self, source):
+        """
+        Finds which bands are available
+        """
+
+        if '1SSV' in source:
+            print('found vv')
+            return ['vv']
+        if '1SDV' in source:
+            print('found vv and vh')
+            return ['vh', 'vv']
+        raise Exception("unknown source type")
+
+
+    def process ( self, s3_bucket, in_scene, scene, out_path, ext_dem_path_list_local, region, args=None  ):
 
         """
         entry point to class functionality
         """
 
+        ext_dem = ext_dem_path_list_local
+        scene_name = in_scene[:32]
+
         # update arguments
         self.getArguments( args )
         tmp_path = out_path
         # extract scene zip 
-#         print ( 'Extracting dataset: {}'.format( scene ) )
+        #         print ( 'Extracting dataset: {}'.format( scene ) )
         dataset_files = utility.unpackFiles( scene, '(.*?)', tmp_path )
-#         print ( '... OK!' )
+        #         print ( '... OK!' )
 
-        # load metadata into dictionary
+        # load metadata into dictionary from manifest.safe file and annotation xml files
         meta = metadata.getManifest( utility.matchFile( dataset_files, '.*\/manifest.safe' ) )
         meta.update( metadata.getAnnotation( utility.matchFile( dataset_files, '.*\/annotation\/s1.*vv.*\.xml' ) ) )
         
-        # overall output product scene name
+        # overall output product scene name (final str describes the applied SNAP operators from cs_base.xml)
         product = meta[ 'product' ]
         nm = 'S1{}_{}_{}_{}'.format(  product[ 'satellite' ], 
                                         product[ 'mode' ],
                                         meta[ 'acquisition' ][ 'start' ].strftime( '%y%m%dT%H%M%S' ),
                                         'bnr_orb_cal_ml_tf_tc_db' )
         outname = os.path.join( tmp_path, nm )
-#         print( f'OUTNAME: { outname }' )
         
         ##### determine if scene crosses antemeridian #####
         extent = self.getSceneExtent( meta )
         if extent[ 'lon' ][ 'max' ] - extent[ 'lon' ][ 'min' ] > self._fat_swath:
 
-            # densify annotated geolocation grid
-            self._densify.process( utility.matchFiles( dataset_files, '.*\/annotation\/s1.*\.xml' ), grid_pts=250 )
+            print('THE CURRENT IMAGE CROSSES THE AM')
+
+            E_DEM = ext_dem_path_list_local[0]
+            W_DEM = ext_dem_path_list_local[1]
+
+            # densify annotated geolocation grid - CURRENT STUCK POINT FOR AM IMAGERY
+            self._densify.process( utility.matchFiles( dataset_files, '.*\/annotation\/s1.*\.xml' ), grid_pts=250 )  # grid_pts=250
             meta.update( metadata.getGeolocationGrid( utility.matchFile( dataset_files, '.*\/annotation\/s1.*vv.*\.xml' ) ) )
 
+            # print('META:', meta)
+
             # split gcps into east / west sub-groups
-            gcps = self.splitGcps( meta[ 'gcps' ] )
-            chunk_size = int ( math.ceil ( float ( meta[ 'image' ][ 'lines' ] ) / float ( self._chunks ) ) )
+            print('SPLITTING EAST AND WEST GCPS')
+            # print('GCPS:', meta[ 'gcps' ])
+            gcps = self.splitGcps( meta[ 'gcps' ] )  # gcps = the ground points on the scene
+            # print('GCPS SPLIT:', gcps)
+            chunk_size = int ( math.ceil ( float ( meta[ 'image' ][ 'lines' ] ) / float ( self._chunks ) ))  # halving the chunk size
+            print('CHUNK SIZE', chunk_size)
     
             # process subset blocks either side of antemeridian
-            results = []
+            print('PROCESSING EITHER SIDE OF THE AM')
+            # results = []
+            # subset_images = []
             for hemisphere in [ 'east', 'west' ]:
+
+                results = []  # redefining per hemisphere
+                print('PROCESSING:', hemisphere)
+                print('TIME NOW:', datetime.now().strftime("%H:%M:%S"))
 
                 # for each row block
                 start_row = 0; offset = 10  # ensure subsets overlap
@@ -95,36 +147,49 @@ class Raw2Ard:
                                 'end' : min ( start_row + chunk_size + offset, meta[ 'image' ][ 'lines' ] - 1 ),
                                 'samples' : meta[ 'image' ][ 'samples' ],
                                 'lines' : meta[ 'image' ][ 'lines' ] }
+                    
+                    # block = {   'start' : max( start_row - offset, 0 ),
+                    #             'end' : min ( start_row + chunk_size + offset, meta[ 'image' ][ 'lines' ] - 1 ),
+                    #             'samples' : meta[ 'image' ][ 'samples' ],
+                    #             'lines' : meta[ 'image' ][ 'lines' ] }
 
-                    subset = self.getSubset( gcps[ hemisphere ], block )
+                    subset = self.getSubset( gcps[ hemisphere ], block )  # CAN THIS JUST BE 1 FOR EAST AND 1 FOR WEST? 
 
-                    # unq subset name
+                    print('SUBSET:', subset)  # x,y coors of the subset in gcps
+
+                    # setting unq subset name
                     subset_name = '_'.join( str ( int( x ) ) for x in subset )
-#                     print ( 'Processing {} subset: {}'.format( hemisphere, subset_name ) )
+                    # print ( 'Processing {} subset: {}'.format( hemisphere, subset_name ) )
                     
                     ######################### PT1 - ####################################
                     ##### load PT1 schema #####
-            #         schema = self.buildSchema( copy.deepcopy( self._base ), meta )
-                    schema = copy.deepcopy( self._pt1 ) 
-#                     print( schema )
-                    
-#                     print('dataset_files: ', dataset_files)
+                    # schema = self.buildSchema( copy.deepcopy( self._base ), meta )
+                    # schema = copy.deepcopy( self._pt1 ) 
+                    schema = deepcopy( self._pt1 ) 
+                    # print( schema )
+                    # print('dataset_files: ', dataset_files)
+
+                    # print(f'SCHEMA: {schema}')
                     
                     ##### set parameters of reader task #####
+                    print('SET PARAMETERS OF READER TASK')
                     param = self.getParameterSet( schema, 'Read' )
-                    param[ 'file' ] = dataset_files[ 0 ] + '/manifest.safe'       # parent path to extracted dataset
+                    param[ 'file' ] = dataset_files[ 0 ] + 'manifest.safe'       # parent path to extracted dataset
                     param[ 'formatName' ] = 'SENTINEL-1'
 
                     ##### insert subset task #####
+                    print('INSERT SUBSET TASK')
                     schema = self.insertNewTask( schema, 'Subset', after='Read' )
                     param = self.getParameterSet ( schema, 'Subset' )
                     param[ 'geoRegion' ] = ''
                     
                     ##### copy subset values into schema dictionary #####
+                    print('COPYING SUBSET VALUES INTO SCEMA DICT')
                     param = self.getParameterSet ( schema, 'Subset' )
                     param[ 'region' ] = ','.join( str ( int( x ) ) for x in subset )
 
                     ##### ext dem input file #####
+                    print('SORTING OUT THE EXT DEMS FOR TF PROCESS')
                     param = self.getParameterSet ( schema, 'Terrain-Flattening' )
                     if hemisphere == 'west':
                         param[ 'externalDEMFile' ] = W_DEM
@@ -132,6 +197,7 @@ class Raw2Ard:
                         param[ 'externalDEMFile' ] = E_DEM
 
                     ##### ext dem input file #####
+                    print('SORTING OUT THE EXT DEMS FOR TC PROCESS')
                     param = self.getParameterSet ( schema, 'Terrain-Correction' )            
                     if hemisphere == 'west':
                         param[ 'externalDEMFile' ] = W_DEM
@@ -139,122 +205,236 @@ class Raw2Ard:
                         param[ 'externalDEMFile' ] = E_DEM
                         
                     # create subset-specific output path
-#                     param = self.getParameterSet ( schema, 'Write(3)' )            
+                    # param = self.getParameterSet ( schema, 'Write(3)' )            
                     param = self.getParameterSet ( schema, 'Write' )   
                     param['formatName'] = 'ENVI'
-                    
-#                     outname_pt1 = os.path.join( outname, 'subset_'+ subset_name + '_bnr_orb_cal_ml')
+                    # outname_pt1 = os.path.join( outname, 'subset_'+ subset_name + '_bnr_orb_cal_ml')
                     outname_pt1 = os.path.join( outname, 'subset_'+ subset_name + '_Orb_Cal_Deb_ML_TF_TC_dB')
-#                     print( 'PT1 OUTNAME: ', outname_pt1 )
+                    # print( 'PT1 OUTNAME: ', outname_pt1 )
                     param[ 'file' ] = outname_pt1
-#                     param[ 'file' ] = os.path.join( outname, outname_pt1 + 'subset_' + subset_name )
+                    # param[ 'file' ] = os.path.join( outname, outname_pt1 + 'subset_' + subset_name )
                     results.append( param['file'] ) # needs to be final output for each subset ############
 
+                    print('PARAMS:', param)
+
                     # transform dict back to xml schema & save serialised xml schema to file
+                    print('TRANSFORMING DICT BACK TO XML SCHEMA AND SAVE SERIALISED XML SCHEMA')
                     out = xmltodict.unparse( schema, pretty=True )
-                    cfg_pathname = os.path.join ( tmp_path, '{}.xml'.format( os.path.basename(outname_pt1) ) )
+                    cfg_pathname = os.path.join ( tmp_path, '{}.xml'.format( os.path.basename(outname_pt1) ) )# path to the xml file to be executed for preprocessing?
                     with open( cfg_pathname, 'w+') as file:
+                        print(f'xml file: ', file)
                         file.write(out)
 
-                    ##### execute PT1 processing for subset #####
-#                     print ( 'Processing PT1 {} subset: {}'.format( hemisphere, subset_name ) )
+                    ##### execute PT1 processing for subset --- WHAT IS THIS EVEN DOING? #####
+                    print ( f'PROCESSING PT1 {hemisphere} SUBSET: {subset_name}' )
+                    # print(f'WHAT IS cfg_pathname: {cfg_pathname}')
                     out, err, code = utility.execute( self._gpt, [ cfg_pathname ] )
-#                     print ( f'OUT: { out }' )
-#                     print ( f'ERR: { err }' )
-#                     print ( '... OK!' )
+                    
+                    print('----------------------------------------------')
+                    err_str = err.decode("utf-8")
+                    err_msg = err_str.split('\n')
+                    print ( f'SNAP ERR MSG:' )  # log of any errors/warnings from snap
+                    for line in err_msg:
+                        print(line)
+                    print ( f'SNAP OUTPUT: { out }' )  # snap output messages
+                    print('----------------------------------------------')
+                    print ( f'WHAT IS CODE: { code }' )  # status code of 0 => successful run
 
-            
+                    print('PROCESSED THAT BLOCK, MOVING ONTO NEXT')
+
+
+
                     # move onto next block
                     start_row += chunk_size
+
+                ############# within the East and then West loops
+
+                # getting each hemisphere's mosaic in each polarisation and their paths
+                if hemisphere == 'east':
+                    vv_east_mosaic_path = self.generateImage( out_path, results, 'VV', scene_name, hemisphere )
+                    vh_east_mosaic_path = self.generateImage( out_path, results, 'VH', scene_name, hemisphere )
+
+                else:
+                    vv_west_mosaic_path = self.generateImage( out_path, results, 'VV', scene_name, hemisphere )
+                    vh_west_mosaic_path = self.generateImage( out_path, results, 'VH', scene_name, hemisphere )
+
+            return ['S1AM', vv_east_mosaic_path, vh_east_mosaic_path, vv_west_mosaic_path, vh_west_mosaic_path]  # ['S1AM', vv_pathname, vh_pathname] # # ['S1AM', vv_mosaic_path, vv_mosaic_path]
+
+        else:
+
+            ##### normal S1 preprocessing with snap gpt #####
+            print('THE CURRENT IMAGE DOES NOT CROSSES THE AM')
+            print('STARTING SNAP GPT PROCESSING')
+
+            ###--- setting up s1-specific relative inputs/paths
+            scene_name = in_scene[:32]
+            input_mani = tmp_path + in_scene + '/manifest.safe'
+            inter_prod1 = tmp_path + scene_name + '_Orb_Cal_Deb_ML.dim'
+            inter_prod1_dir = inter_prod1[:-4] + '.data/'
+            inter_prod2 = tmp_path + scene_name + '_Orb_Cal_Deb_ML_TF.dim'
+            inter_prod2_dir = inter_prod2[:-4] + '.data/'
+            out_prod1 = tmp_path + scene_name + '_Orb_Cal_Deb_ML_TF_TC_dB.dim'
+            out_dir1 = out_prod1[:-4] + '.data/'
+            out_prod2 = tmp_path + scene_name + '_Orb_Cal_Deb_ML_TF_TC_lsm.dim'
+            out_dir2 = out_prod2[:-4] + '.data/'
+            down_dir = tmp_path + in_scene + '/'
+    
+            snap_gpt = os.getenv("GPT_PATH", '/opt/snap/bin/gpt')  # '/home/spatialdaysubuntu/esa_snap/bin/gpt'  # os.environ['SNAP_GPT']  # ENV VAR '/opt/snap/bin/gpt'
+            int_graph_1 = 'workflows/utils/cs_s1_pt1_bnr_Orb_Cal_ML.xml'  # os.environ['S1_PROCESS_P1A']  # ENV VAR
+
+
+            ############## EXTERNAL DEMS #################
+
+            ### - find out which region we're looking at
+            avaliable_regions = ['fiji', 'vanuatu', 'solomon']  # MAKE THIS AN ENV VAR (see also prep_utils.download_external_dems())
+
+            if region.lower() in avaliable_regions:
+                if region.lower() == 'fiji':
+                    ### - find out if the image is in east or west and use that dem
+                    print('THE META AOI - TO FIND LONGITUDE')
+                    print(meta[ 'aoi' ][1][1])
+                    # checking if any longitude in aoi is -ve => west emisphere => west dem
+                    if meta[ 'aoi' ][1][1] < 0:
+                        print(meta[ 'aoi' ][1][1], ' is negative therefore the image is in the western hemisphere')
+                        ext_dem = ext_dem_path_list_local[1]  # '/tmp/data/intermediate/' + ext_dem_path_list_local[1].split('/')[-1]  # W_DEM.split('/')[-1] 
+                    else:
+                        print(meta[ 'aoi' ][1][1], ' is positive therefore the image is in the eastern hemisphere')
+                        ext_dem = ext_dem_path_list_local[0]  #'/tmp/data/intermediate/' + ext_dem_path_list_local[0].split('/')[-1]  # E_DEM.split('/')[-1]
+                        print('E_DEM:', ext_dem)
+                else:
+                    ext_dem = ext_dem_path_list_local[0]
+                    print(f'USING EXT DEM: {ext_dem}')
+            else:
+                ext_dem = None
+                print('SETTING THE EXT_DEM TO NONE')
+
+            if ext_dem:
+                print('EXTERNAL DEMS BEING USED')
+                ext_dem_path = ext_dem  # '/tmp/data/intermediate/' + ext_dem  # tmp_path + 'ext_dem.tif'
+                int_graph_2 = 'workflows/utils/cs_s1_pt2A_TF.xml'  # os.environ['S1_PROCESS_P2A']  # ENV VAR
+                int_graph_3 = 'workflows/utils/cs_s1_pt3A_TC_db.xml'  # os.environ['S1_PROCESS_P3A']  # ENV VAR
+                int_graph_4 = 'workflows/utils/cs_s1_pt4A_Sm_Bm_TC_lsm.xml'  # os.environ['S1_PROCESS_P4A', ]  # ENV VAR
+            else:  # when ext_dem is None or not found
+                print('SNAP DEFAULT DEMS BEING USED')
+                int_graph_2 = 'workflows/utils/without_external_dems/cs_s1_pt2A_TF.xml'  # os.environ['S1_PROCESS_P2A']  # CREATE ENV VAR
+                int_graph_3 = 'workflows/utils/without_external_dems/cs_s1_pt3A_TC_db.xml'  # os.environ['S1_PROCESS_P3A']  # CREATE ENV VAR
+                int_graph_4 = 'workflows/utils/without_external_dems/cs_s1_pt4A_Sm_Bm_TC_lsm.xml'  # os.environ['S1_PROCESS_P4A', ]  # CREATE ENV VAR
             
-#             print('mosaic VV')
-            # mosaic subsets into single image
-            self.generateImage( out_path, results, 'VV' )
-#             print('mosaic VH')
-            self.generateImage( out_path, results, 'VH' )
-
-        #else:
-
-            ##### do usual stuff #####
-        
-        return
+            # root = setup_logging()
+            root.info('{} {} Starting'.format(in_scene, scene_name))
             
-            
-            
-            
-#                     ######################### PT2 - ####################################
-#                     ##### load PT2 schema #####
-#                     schema = copy.deepcopy( self._pt2 ) 
-#                     print( schema )
-                    
-#                     ##### set parameters of reader task #####
-#                     param = self.getParameterSet( schema, 'Read' )
-#                     param[ 'file' ] = outname_pt1 + '.dim'        # prev pt output as input
-#                     param[ 'formatName' ] = 'SENTINEL-1'
+            ###--- the S1 preprocessing steps with snap gpt
+            try:
+                print('FINDING AVALIBLE BANDS')
 
-#                     # create subset-specific output path
-#                     param = self.getParameterSet ( schema, 'Write' )            
-                    
-#                     outname_pt2 = os.path.join( outname, 'subset_'+ subset_name + '_bnr_orb_cal_ml_tf')
-#                     print( 'PT2 OUTNAME: ', outname_pt2 )
-#                     param[ 'file' ] = outname_pt2
-# #                     param[ 'file' ] = os.path.join( outname, outname_pt1 + 'subset_' + subset_name )
-# #                     results.append( param['file'] ) # needs to be final output for each subset ############
+                # Figure out what bands are available.
+                bands = self.available_bands(in_scene)
 
-#                     # transform dict back to xml schema & save serialised xml schema to file
-#                     out = xmltodict.unparse( schema, pretty=True )
-#                     cfg_pathname = os.path.join ( tmp_path, '{}.xml'.format( os.path.basename(outname_pt2) ) )
-#                     with open( cfg_pathname, 'w+') as file:
-#                         file.write(out)
+                ###--- PART 1
+                # cmd contains the path to gpt, the graph xml file to use, and the params to pass into the file
+                cmd = [
+                    snap_gpt,
+                    int_graph_1,
+                    f"-Pinput_grd={input_mani}",
+                    f"-Poutput_ml={inter_prod1}",
+                    f"-Psource_bands={self.create_selected_polarisations(bands)}"
+                ]
 
-#                     ##### execute PT1 processing for subset #####
-#                     print ( 'Processing PT2 {} subset: {}'.format( hemisphere, subset_name ) )
-#                     out, err, code = utility.execute( self._gpt, [ cfg_pathname ] )
-#                     print ( f'OUT: { out }' )
-#                     print ( f'ERR: { err }' )
-#                     print ( '... OK!' )
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
+                root.info(cmd)
+                run_snap_command(cmd)
+                root.info(f"{in_scene} {scene_name} PROCESSED to MULTILOOK starting PT2")
 
-#         cmd = [snap_gpt, int_graph_1, f"-Pinput_grd={input_mani}", f"-Poutput_ml={inter_prod1}"]
-#         root.info(cmd)
-#         run_snap_command(cmd)
-#         root.info(f"{in_scene} {scene_name} PROCESSED to MULTILOOK starting PT2")
+                print(f'external dem: {ext_dem}')
+
+                # if there isnt one of the out products yet - do we need this? - issue if not cleaning every time
+                if ext_dem:  # not os.path.exists(out_prod1):
+                    # inc. function to subset by S1 scene extent on fly due to cog - what does this mean?
+
+                    print('PREPROCESSING WITH EXTERNAL DEM')
+
+                    cmd = [
+                        snap_gpt,
+                        int_graph_2,
+                        f"-Pinput_ml={inter_prod1}",
+                        f"-Pext_dem={ext_dem_path}",
+                        f"-Poutput_tf={inter_prod2}"
+                    ]  # f"-Pext_dem={ext_dem_path}",
+
+                    root.info(cmd)
+                    run_snap_command(cmd)
+                    root.info(f"{in_scene} {scene_name} PROCESSED to TERRAIN FLATTEN starting PT3")
+
+                    # processes the TF image with TC and db
+                    cmd = [
+                        snap_gpt,
+                        int_graph_3,
+                        f"-Pinput_tf={inter_prod2}",
+                        f"-Pext_dem={ext_dem_path}",
+                        f"-Poutput_db={out_prod1}",
+                        f"-Psource_bands={self.create_source_bands(bands)}"
+                    ]  # f"-Pext_dem={ext_dem_path}",
+
+                    root.info(cmd)
+                    run_snap_command(cmd)
+                    root.info(f"{in_scene} {scene_name} PROCESSED to dB starting PT4")
+
+                    cmd = [
+                        snap_gpt,
+                        int_graph_4,
+                        f"-Pinput_tf={inter_prod2}",
+                        f"-Pext_dem={ext_dem_path}",
+                        f"-Poutput_ls={out_prod2}"
+                    ]  # f"-Pext_dem={ext_dem_path}",
                 
-#         if not os.path.exists(out_prod1):
-#             if ext_dem:
-#                 s3_download(s3_bucket, ext_dem, ext_dem_path)  # inc. function to subset by S1 scene extent on fly due to cog
-#                 cmd = [snap_gpt, int_graph_2, f"-Pinput_ml={inter_prod1}", f"-Pext_dem={ext_dem_path}", f"-Poutput_tf={inter_prod2}"]
-#                 root.info(cmd)
-#                 run_snap_command(cmd)
-#                 root.info(f"{in_scene} {scene_name} PROCESSED to TERRAIN FLATTEN starting PT3")
+                    root.info(cmd)
+                    run_snap_command(cmd)
+                    root.info(f"{in_scene} {scene_name} PROCESSED to lsm starting COG conversion")
 
+                else:  # with snap default dems
 
-#                 cmd = [snap_gpt, int_graph_3, f"-Pinput_tf={inter_prod2}", f"-Pext_dem={ext_dem_path}", f"-Poutput_db={out_prod1}"]
-#                 root.info(cmd)
-#                 run_snap_command(cmd)
-#                 root.info(f"{in_scene} {scene_name} PROCESSED to dB starting PT4")
-
-#                 cmd = [snap_gpt, int_graph_4, f"-Pinput_tf={inter_prod2}", f"-Pext_dem={ext_dem_path}", f"-Poutput_ls={out_prod2}"]
-#                 root.info(cmd)
-#                 run_snap_command(cmd)
-#                 root.info(f"{in_scene} {scene_name} PROCESSED to lsm starting COG conversion")
+                    print('USING SNAP DEFAULT DEMS')
                     
-                    
-                    
-                    
-                    
+                    cmd = [
+                        snap_gpt,
+                        int_graph_2,
+                        f"-Pinput_ml={inter_prod1}",
+                        f"-Poutput_tf={inter_prod2}"
+                    ]
+                    root.info(cmd)
+                    run_snap_command(cmd)
+                    root.info(f"{in_scene} {scene_name} PROCESSED to TERRAIN FLATTEN starting PT3")
+
+                    # processes the TF image with TC and db
+                    cmd = [
+                        snap_gpt,
+                        int_graph_3,
+                        f"-Pinput_tf={inter_prod2}",
+                        f"-Poutput_db={out_prod1}",
+                        f"-Psource_bands={self.create_source_bands(bands)}"
+                    ] 
+
+                    root.info(cmd)
+                    run_snap_command(cmd)
+                    root.info(f"{in_scene} {scene_name} PROCESSED to dB starting PT4")
+
+                    cmd = [
+                        snap_gpt,
+                        int_graph_4,
+                        f"-Pinput_tf={inter_prod2}",
+                        f"-Poutput_ls={out_prod2}"
+                    ]
+                
+                    root.info(cmd)
+                    run_snap_command(cmd)
+                    root.info(f"{in_scene} {scene_name} PROCESSED to lsm starting COG conversion")
 
 
-
+            except Exception as e:
+                logging.critical(e, exc_info=True) 
+                print('SNAP GPT PREPROCESSING FAILED')
+        
+            return ['S1', out_prod1, out_prod2]
+    
 
     def getArguments( self, args ):
 
@@ -328,11 +508,12 @@ class Raw2Ard:
         """
 
         # get xml schema for new task
-        with open ( os.path.join( './utils/s1am/recipes/nodes', name + '.xml'  )) as fd:
+        with open ( os.path.join( 'workflows/utils/s1am/recipes/nodes', name + '.xml'  )) as fd:
             new_task = xmltodict.parse( fd.read() )[ 'node' ]
 
         # create new ordered dict 
-        update = copy.deepcopy( schema )
+        # update = copy.deepcopy( schema )
+        update = deepcopy( schema )
         update[ 'graph' ][ 'node' ].clear()
  
         # copy nodes into deep copy 
@@ -676,27 +857,34 @@ class Raw2Ard:
         return [ subset[ 'x1' ], subset[ 'y1' ], subset[ 'x2' ], subset[ 'y2' ] - subset[ 'y1' ] ]
 
 
-    def generateImage( self, out_path, results, pol ):
+    def generateImage( self, out_path, results, pol, scene_name, hemisphere ):
 
         """
         combine subset output images into single mosaic 
+
+        out_path => specific tmp path within the tmp dir
         """
+
+        print('COMBINING SUBSET OUTPUT IMAGES INTO SINGLE MOSAIC')
        
         # find subset images
         images = []
+        # print('RESULTS:', results)
         for result in results:
 
             files = list( Path( result ).rglob( '*{}*.img'.format( pol ) ) )
+            # print('FILES:', files)
             if len( files ) == 1:
                 images.append( str ( files[ 0 ] ) )
 
         # use gdal warp to create mosaic
-        kwargs = { 'format': 'GTiff', 'srcNodata' : 0.0, 'dstSRS' : 'epsg:3460' }
-        pathname = os.path.join( out_path, 'Gamma0_{}_db.tif'.format( pol ) )
+        kwargs = { 'format': 'GTiff', 'srcNodata' : 0.0, 'dstSRS' : 'epsg:4326' }  # needs epsg 4326 - but this causes gdal disk space error?  # 3460
+        pathname = os.path.join( out_path, f'{scene_name}_{hemisphere}_Gamma0_{pol}_db.tif' )
 
-        ds = gdal.Warp( pathname, images, **kwargs )
+        ds = gdal.Warp( pathname, images, **kwargs )  # (output dataset name/object, array of dataset objects or filenames, kwargs)
+        print('WHAT IS DS:', ds)
         del ds
 
-        return
+        return pathname
 
 
