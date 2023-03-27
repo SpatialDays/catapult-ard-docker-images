@@ -381,6 +381,8 @@ def ls8_unpack_qa(data_array, cover_type):
     else:
         raise ValueError(f"Cover type {cover_type} not supported for Landsat 8 yet")
 
+    # invert the boolean mask
+    boolean_mask = np.invert(boolean_mask)
     logging.info(f"Applied {cover_type} mask for Landsat 8")
     return xr.DataArray(boolean_mask.astype(bool),
                         coords=data_array.coords,
