@@ -131,6 +131,8 @@ def landsat_clean_mask_invalid(dataset):
 
 def landsat_qa_clean_mask(dataset, platform, cover_types=['water','clear']):
     """
+    Water is 0, Clear is 1 and everything else is nodata
+
     Returns a clean_mask for `dataset` that masks out various types of terrain cover using the
     Landsat pixel_qa band. Note that Landsat masks specify what to keep, not what to remove.
     This means that using `cover_types=['clear', 'water']` should keep only clear land and water.

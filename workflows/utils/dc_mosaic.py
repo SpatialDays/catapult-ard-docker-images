@@ -374,10 +374,10 @@ def ls8_unpack_qa(data_array, cover_type):
     boolean_mask = np.zeros(data_array.shape, dtype=bool)
     if cover_type == 'clear':
         # make a boolean mask have true values only where  the 6th bit is 1, other bits can be whatever
-        boolean_mask |= (data_array & 0b1000000) != 0
+        boolean_mask |= (data_array & 0b0000000001000000) != 0
     elif cover_type == 'water':
         # make a boolean mask have true values only where the 7th bit is 1, other bits can be whatever
-        boolean_mask |= (data_array & 0b10000000) != 0
+        boolean_mask |= (data_array & 0b0000000010000000) != 0
     else:
         raise ValueError(f"Cover type {cover_type} not supported for Landsat 8 yet")
 
