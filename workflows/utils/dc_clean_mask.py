@@ -129,7 +129,7 @@ def landsat_clean_mask_invalid(dataset):
     return invalid_mask
 
 
-def landsat_qa_clean_mask(dataset, platform, cover_types=['water','clear']):
+def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water']):
     """
     Water is 0, Clear is 1 and everything else is nodata
 
