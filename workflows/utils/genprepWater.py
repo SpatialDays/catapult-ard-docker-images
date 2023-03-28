@@ -22,7 +22,8 @@ from workflows.utils.dc_clean_mask import landsat_qa_clean_mask
 from workflows.utils.prep_utils import *
 from workflows.utils.dc_import_export import export_xarray_to_geotiff
 
-
+import logging
+logger = logging.getLogger(__name__)
     
 def rename_bands(in_xr, des_bands, position):
     in_xr.name = des_bands[position]
@@ -228,8 +229,12 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
             o_bands_data = [ resamp_bands(i, o_bands_data) for i in o_bands_data ]
             bands_data = xr.merge([rename_bands(bd, des_bands, i) for i,bd in enumerate(o_bands_data)]).rename({'band': 'time'}) # ensure band names & dims consistent
             bands_data = bands_data.assign_attrs(o_bands_data[0].attrs) # crs etc. needed later
+            for i in o_bands_data: i.close()
+            o_bands_data = None
             bands_data['time'] = [datetime.strptime(yml_meta['extent']['center_dt'], '%Y-%m-%d %H:%M:%S')] # time dim needed for wofs
             root.info(f"{scene_name} Loaded & Reformatted bands")
+            # log number of bands loaded
+            root.info(f"{scene_name} Loaded {len(bands_data.data_vars)} bands")
         except:
             root.exception(f"{scene_name} Band data not loaded properly")
             raise Exception('Data formatting error')
@@ -239,6 +244,7 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
             # if landsat in satellite:
             if 'LANDSAT' in satellite:
                 clearsky_masks = landsat_qa_clean_mask(bands_data, satellite) # easy amendment in this function to inc. sentinel-2...?
+                logger.info(f"Got the clearsky mask for {satellite}")
             elif 'SENTINEL_2' in satellite:
                 clearsky_masks = (
                     (bands_data.scene_classification == 2) | # DARK_AREA_PIXELS
@@ -252,7 +258,10 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
             # elif sentinel-1 in satellite:
 #             clearsky_masks = landsat_qa_clean_mask(bands_data, satellite) # easy amendment in this function to inc. sentinel-2...?
             
-            clearsky_scenes = bands_data.where(clearsky_masks)
+
+            logger.info(f"Starting to apply the clearsky mask for {satellite}")
+            clearsky_scenes = bands_data.where(clearsky_masks) # !!!this consumes a lot of memory!!!
+            logger.info(f"Applied the clearsky mask for {satellite}")
 #             if satellite == 'SENTINEL_2':
 #                 clearsky_scenes = clearsky_scenes.rename_vars({'swir_1': 'swir1', 'swir_2': 'swir2'})
             root.info(f"{scene_name} Loading & Reformatting bands")
@@ -279,6 +288,7 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
                 water_classes = water_classes.where(clearsky_masks).where(mask) # re-apply nan mask to differentiate no-water from no-data
                 print('mask worked')
             else:
+                logger.info(f"Applying the clearsky mask for {satellite} again")
                 water_classes = water_classes.where(clearsky_masks) # re-apply nan mask to differentiate no-water from no-data
             water_classes = water_classes.fillna(-9999) # -9999 
             water_classes = water_classes.squeeze('time') # can't write geotif with time dim
@@ -323,7 +333,6 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
             raise Exception('S3  upload error')
 
 
-        for i in o_bands_data: i.close()
         bands_data.close()
         clearsky_masks.close()
         clearsky_scenes.close()
