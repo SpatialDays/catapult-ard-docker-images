@@ -15,3 +15,7 @@ services:
       - S3_ENDPOINT=http://localhost:30003
       - S3_BUCKET=ard-bucket
     command: ["python3", "-m","water-classification-wofs.worker-water"]
+    deploy:
+      resources:
+        limits:
+          memory: 4000M

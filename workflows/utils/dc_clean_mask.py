@@ -2,7 +2,9 @@ from .dc_mosaic import (ls7_unpack_qa, ls8_unpack_qa, ls5_unpack_qa, ls4_unpack_
 import numpy as np
 import xarray as xr
 from xarray.ufuncs import logical_or  as xr_or
+import logging
 
+logger = logging.getLogger(__name__)
 
 ## Utils ##
 
@@ -127,8 +129,10 @@ def landsat_clean_mask_invalid(dataset):
     return invalid_mask
 
 
-def landsat_qa_clean_mask(dataset, platform, cover_types=['water']):
+def landsat_qa_clean_mask(dataset, platform, cover_types=['water','clear']):
     """
+    Water is 0, Clear is 1 and everything else is nodata
+
     Returns a clean_mask for `dataset` that masks out various types of terrain cover using the
     Landsat pixel_qa band. Note that Landsat masks specify what to keep, not what to remove.
     This means that using `cover_types=['clear', 'water']` should keep only clear land and water.
@@ -187,6 +191,7 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['water']):
     else: 
         
         for i, cover_type in enumerate(cover_types):
+            logger.info('running cover_type: {}'.format(cover_type))
             cover_type_clean_mask = processing_options[platform](dataset.pixel_qa, cover_type)
             clean_mask = cover_type_clean_mask if i == 0 else xr_or(clean_mask, cover_type_clean_mask)
     
@@ -199,7 +204,7 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['water']):
 #             cover_type_clean_mask = processing_options[platform](dataset.scene_classification, cover_type)
 #         clean_mask = cover_type_clean_mask if i == 0 else (clean_mask | cover_type_clean_mask)
 
-
+    logger.info(f"Returning clean mask for {platform} with cover types: {cover_types}.")
     return clean_mask
 
 ## End Landsat ##
