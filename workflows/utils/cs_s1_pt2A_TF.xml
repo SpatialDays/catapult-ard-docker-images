@@ -17,7 +17,7 @@
       <demName>External DEM</demName>
       <demResamplingMethod>BILINEAR_INTERPOLATION</demResamplingMethod>
       <externalDEMFile>$ext_dem</externalDEMFile>
-      <externalDEMNoDataValue>-9999</externalDEMNoDataValue>
+      <externalDEMNoDataValue>-9999.0</externalDEMNoDataValue>
       <externalDEMApplyEGM>True</externalDEMApplyEGM>
       <outputSimulatedImage>false</outputSimulatedImage>
       <additionalOverlap>0.1</additionalOverlap>
