@@ -11,7 +11,6 @@ from asynchronousfilereader import AsynchronousFileReader
 import boto3
 import botocore
 import click
-# import gdal
 from osgeo import gdal
 import rasterio
 import requests
@@ -49,7 +48,7 @@ def to_cog(input_file, output_file, nodata=0):
         logging.warning(f'cannot find product: {input_file}')
 
 
-def discover_tiffs(in_dir, hemisphere=None):  # hemisphere=None
+def discover_tiffs(in_dir, hemisphere=None):
     prod_paths = []
 
     # check for the hemisphere
@@ -67,17 +66,10 @@ def discover_tiffs(in_dir, hemisphere=None):  # hemisphere=None
 
     return prod_paths
 
-    # original method
-    # for root, dirs, files in os.walk(in_dir):
-    #     for file in files:
-    #         if file.endswith('.tiff') or file.endswith('.tif'):
-    #             prod_paths.append(os.path.join(root, file))
-    # return prod_paths
-
 
 def conv_sgl_cog(in_path, out_path, nodata=0):
     # set default cog profile (as recommended by alex leith)
-    print('COG CREATING STAGE')
+    logging.info('COG CREATING STAGE')
     cog_profile = {
         'driver': 'GTiff',
         'interleave': 'pixel',
@@ -107,7 +99,6 @@ def conv_sgl_cog(in_path, out_path, nodata=0):
     else:
         logging.info('not updated nodata')
 
-    # should inc. cog val...
 
 
 def clean_up(work_dir: str) -> None:
@@ -119,33 +110,29 @@ def clean_up(work_dir: str) -> None:
 # Check if external DEMs need to be downloaded, and download them if necessary
 def download_external_dems(region, in_scene, scene_name, tmp_inter_dir, s3_bucket, root):
 
-    # ADJUST THIS PROCESS ONCE THE OTHER DEMS ARE ON THE S3 BUCKET
+    avaliable_regions = ['fiji', 'vanuatu', 'solomon']  # TO DO - MAKE THIS AN ENV VAR (see also raw2ard.py)
 
-    avaliable_regions = ['fiji', 'vanuatu', 'solomon']  # MAKE THIS AN ENV VAR (see also raw2ard.py)
-
-    print('REGION LOWER:', region.lower())
+    logging.info(f'REGION LOWER: {region.lower()}')
 
     if region.lower() in avaliable_regions:
 
         region_name = region.lower()  # .capitalize()
-        print('REGION NAME:', region_name)
+        logging.info(f'REGION NAME: {region_name}')
 
         if region_name.lower() == 'fiji':
 
-            print(f'CREATING EXT DEM PATHS FOR {region_name}')
+            logging.info(f'CREATING EXT DEM PATHS FOR {region_name}')
 
             # Set the paths to the external DEMs to be downloaded
             ext_dem_path_east = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name.capitalize()}_E.tif"
             ext_dem_path_west = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name.capitalize()}_W.tif"
             ext_dem_path_list = [ext_dem_path_east, ext_dem_path_west]
 
-            ext_dem_path_east_local = f"{tmp_inter_dir}ext_dem_{region_name}_e.tif"  # changing SRTM => ext_dem incase of confusion with esa snap gpt
+            ext_dem_path_east_local = f"{tmp_inter_dir}ext_dem_{region_name}_e.tif"
             ext_dem_path_west_local = f"{tmp_inter_dir}ext_dem_{region_name}_w.tif"
-            # ext_dem_path_west_local = f"{tmp_inter_dir}SRTM30_{region_name}_W.tif"
             ext_dem_path_local_list = [ext_dem_path_east_local, ext_dem_path_west_local]
         else:
-            # for vanuatu and solmon there is only 1 dem
-            print(f'CREATING EXT DEM PATHS FOR {region_name}')
+            logging.info(f'CREATING EXT DEM PATHS FOR {region_name}')
 
             ext_dem_path = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name.capitalize()}.tif"
             ext_dem_path_list = [ext_dem_path]
@@ -154,10 +141,10 @@ def download_external_dems(region, in_scene, scene_name, tmp_inter_dir, s3_bucke
             ext_dem_path_local_list = [ext_dem_path_local]
 
 
-        root.info(f"{in_scene} {scene_name}: Checking if we have external DEMs")
+        logging.info(f"{in_scene} {scene_name}: Checking if we have external DEMs")
         # Check if the external DEMs need to be downloaded
         if any(not os.path.exists(path) for path in ext_dem_path_local_list):
-            root.info(f"{in_scene} {scene_name}: Downloading external DEMs")
+            logging.info(f"{in_scene} {scene_name}: Downloading external DEMs")
             # Download the external DEMs
             for ext_dem_path, ext_dem_path_local in zip(ext_dem_path_list, ext_dem_path_local_list):
                 try:
@@ -165,17 +152,17 @@ def download_external_dems(region, in_scene, scene_name, tmp_inter_dir, s3_bucke
                     s3_download(s3_bucket, ext_dem_path, ext_dem_path_local)
                 except Exception as e:
                     root.exception(e)
-                    root.exception(f"{ext_dem_path} unavailable")
+                    root.exception(f"{ext_dem_path} unavailable or doesn't exist")
                     # If there's an error, raise an exception
                     raise Exception(f"Failed to download {ext_dem_path}") from e
-            root.info(f"{in_scene} {scene_name}: Downloaded external DEMs")
+            logging.info(f"{in_scene} {scene_name}: Downloaded external DEMs")
         else:
-            root.info(f"{in_scene} {scene_name}: Found external DEMs, skipping download")
+            logging.info(f"{in_scene} {scene_name}: Found external DEMs, skipping download")
         
-        return ext_dem_path_local_list  # ext_dem_path_list
+        return ext_dem_path_local_list
 
     else:
-        print('RETURNING NONE => WILL USE SNAP DEMS')
+        logging.info('RETURNING NONE => WILL USE SNAP DEMS')
         return None  # no external dems => will use snap defaults
 
 
@@ -208,12 +195,8 @@ def run_snap_command(command, timeout =  60*45):
     :return: None
     """
 
-    print('RUNNING SNAP COMMAND')
+    logging.info('RUNNING SNAP COMMAND')
 
-    # if we need to prepend the snap executable.
-    # if command[0] != os.environ['SNAP_GPT']:
-    #     full_command = [os.environ['SNAP_GPT']] + command
-    # else:
     full_command = command
 
     # on linux there is a warning message printed by snap if this environment variable is not set.
@@ -248,7 +231,6 @@ def run_snap_command(command, timeout =  60*45):
         return
     if process.returncode != 0:
         raise Exception("Snap returned non zero exit status")
-
 
 
 def get_file_via_stream(url:str, output_file_path:str) -> None:
@@ -333,7 +315,7 @@ def get_geometry(path):
     """
     logging.debug(f"in get geometry {path}")
     with rasterio.open(path) as img:
-        print('IMAGE META:', img.meta)
+        logging.info(f'IMAGE META: {img.meta}')
         left, bottom, right, top = img.bounds
         crs = str(str(getattr(img, 'crs_wkt', None) or img.crs.wkt))
         corners = {
@@ -455,7 +437,7 @@ def s3_single_upload(in_path, s3_path, s3_bucket):
 
     # Ensure that multipart uploads only happen if the size of a transfer is larger than
     # S3's size limit for non multipart uploads, which is 5 GB. we copy using multipart 
-    # at anything over 4gb
+    # at anything over 2GB
     transfer_config = boto3.s3.transfer.TransferConfig(multipart_threshold=2 * gb,
                                                        max_concurrency=10,
                                                        multipart_chunksize=2 * gb,
@@ -467,9 +449,6 @@ def s3_single_upload(in_path, s3_path, s3_bucket):
     logging.info(f"Start: {in_path} {str(datetime.today().strftime('%Y-%m-%d %H:%M:%S'))}")
 
     s3_client.upload_file(in_path, bucket.name, s3_path)
-
-    # transfer = boto3.s3.transfer.S3Transfer(client=s3_client, config=transfer_config)
-    # transfer.upload_file(in_path, bucket.name, s3_path)
 
     logging.info(f"Finish: {in_path} {str(datetime.today().strftime('%Y-%m-%d %H:%M:%S'))}")
 
@@ -526,7 +505,7 @@ def s3_download(s3_bucket, s3_obj_path, dest_path):
         bucket.download_file(s3_obj_path, dest_path)
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == "404":
-            print("The object does not exist.")
+            logging.info("The object does not exist.")
             raise
         else:
             raise
@@ -698,8 +677,7 @@ def cog_validate_old(ds, check_tiled=True):
                 errors += [
                     'Overview of index %d is not tiled' % i]
 
-        # Check that the IFD of descending overviews are sorted by increasing
-        # offsets
+        # Check that the IFD of descending overviews are sorted by increasing offsets
         ifd_offset = int(ovr_band.GetMetadataItem('IFD_OFFSET', 'TIFF'))
         ifd_offsets.append(ifd_offset)
         details['ifd_offsets']['overview_%d' % i] = ifd_offset
@@ -717,8 +695,7 @@ def cog_validate_old(ds, check_tiled=True):
                     'which is at byte %d' %
                     (i, ifd_offsets[-1], i - 1, ifd_offsets[-2])]
 
-    # Check that the imagery starts by the smallest overview and ends with
-    # the main resolution dataset
+    # Check that the imagery starts by the smallest overview and ends with the main resolution dataset
     block_offset = main_band.GetMetadataItem('BLOCK_OFFSET_0_0', 'TIFF')
     if not block_offset:
         errors += ['Missing BLOCK_OFFSET_0_0']
