@@ -373,7 +373,8 @@ def ls8_unpack_qa(data_array, cover_type):
     logging.info(f"Apply {cover_type} mask for Landsat 8")
     boolean_mask = np.zeros(data_array.shape, dtype=bool)
     if cover_type == 'clear':
-        boolean_mask |=  (data_array & 0b0000000010000000) == 0 & (data_array & 0b0000000001000000) != 0
+        boolean_mask |=  (data_array & 0b0000000010000000) == 0 
+        boolean_mask &=  (data_array & 0b0000000001000000) != 0
     elif cover_type == 'water':
         boolean_mask |= ((data_array & 0b0000000010000000) != 0)
 
