@@ -129,7 +129,7 @@ def landsat_clean_mask_invalid(dataset):
     return invalid_mask
 
 
-def landsat_qa_clean_mask(dataset, platform, cover_types=['water']):
+def landsat_qa_clean_mask(dataset, platform, cover_types=['clear','water']):
     """
     Water is 0, Clear is 1 and everything else is nodata
 
@@ -195,14 +195,13 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['water']):
             cover_type_clean_mask = processing_options[platform](dataset.pixel_qa, cover_type)
             clean_mask = cover_type_clean_mask if i == 0 else xr_or(clean_mask, cover_type_clean_mask)
     
-#         for i, cover_type in enumerate(cover_types):
-        
-#         try:
-#             cover_type_clean_mask = processing_options[platform](dataset.pixel_qa, cover_type)
-#         except:
-#             print('caught')
-#             cover_type_clean_mask = processing_options[platform](dataset.scene_classification, cover_type)
-#         clean_mask = cover_type_clean_mask if i == 0 else (clean_mask | cover_type_clean_mask)
+        # for i, cover_type in enumerate(cover_types):
+        #     try:
+        #         cover_type_clean_mask = processing_options[platform](dataset.pixel_qa, cover_type)
+        #     except:
+        #         print('caught')
+        #         cover_type_clean_mask = processing_options[platform](dataset.scene_classification, cover_type)
+        #     clean_mask = cover_type_clean_mask if i == 0 else (clean_mask | cover_type_clean_mask)
 
     logger.info(f"Returning clean mask for {platform} with cover types: {cover_types}.")
     return clean_mask
