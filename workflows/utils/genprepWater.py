@@ -289,6 +289,10 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
                 print('mask worked')
             else:
                 logger.info(f"Applying the clearsky mask for {satellite} again")
+                # log maximum value in water_classes
+                logger.info(f"Maximum value in water_classes: {water_classes.max().values}")
+                # log the minimum value in water_classes
+                logger.info(f"Minimum value in water_classes: {water_classes.min().values}")
                 water_classes = water_classes.where(clearsky_masks) # re-apply nan mask to differentiate no-water from no-data
             water_classes = water_classes.fillna(-9999) # -9999 
             water_classes = water_classes.squeeze('time') # can't write geotif with time dim
