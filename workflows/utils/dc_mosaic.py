@@ -385,7 +385,9 @@ def ls8_unpack_qa(data_array, cover_type):
 
 
     elif cover_type == 'water':
-        boolean_mask |= (data_array & 0b0000000010000000) != 0
+        # boolean_mask |= (data_array & 0b0000000010000000) != 0
+        boolean_mask_for_water = (data_array & 0b0000000010000000) == 0 #no water
+
     else:
         raise ValueError(f"Cover type {cover_type} not supported for Landsat 8 yet")
 
