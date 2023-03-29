@@ -1,7 +1,7 @@
 from .dc_mosaic import (ls7_unpack_qa, ls8_unpack_qa, ls5_unpack_qa, ls4_unpack_qa, sen2_unpack_qa)
 import numpy as np
 import xarray as xr
-from xarray.ufuncs import logical_or  as xr_or
+from xarray.ufuncs import logical_or  as {"optical_yaml_path": "common_sensing/fiji/landsat_8/LC08_L1TP_075072_20200224/datacube-metadata.yaml", "s3_bucket": "ard-bucket", "s3_dir": "common_sensing/fiji/landsat_8_wofs/"}
 import logging
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,7 @@ def landsat_clean_mask_invalid(dataset):
     return invalid_mask
 
 
-def landsat_qa_clean_mask(dataset, platform, cover_types=['clear','water']):
+def landsat_qa_clean_mask(dataset, platform, cover_types=['clear']):
     """
     Water is 0, Clear is 1 and everything else is nodata
 
