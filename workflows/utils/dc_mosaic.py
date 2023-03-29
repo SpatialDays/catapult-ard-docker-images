@@ -375,6 +375,8 @@ def ls8_unpack_qa(data_array, cover_type):
     if cover_type == 'clear':
         boolean_mask |=  (data_array & 0b0000000010000000) == 0 
         boolean_mask &=  (data_array & 0b0000000001000000) != 0
+        # invert boolean mask
+        boolean_mask = np.invert(boolean_mask)
     elif cover_type == 'water':
         boolean_mask |= ((data_array & 0b0000000010000000) != 0)
 
