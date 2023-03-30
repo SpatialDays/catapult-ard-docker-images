@@ -63,5 +63,8 @@ RUN ./update_snap.sh
 COPY workflows/utils/s1am/snap/bin/gpt.vmoptions /opt/snap/bin
 COPY workflows/utils/s1am/snap/etc/snap.auxdata.properties /opt/snap/etc
 RUN pip install rioxarray
+RUN pip install salem
+RUN pip install sklearn-xarray
+RUN pip install dask
 COPY . /app
 WORKDIR /app
