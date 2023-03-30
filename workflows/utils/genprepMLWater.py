@@ -207,12 +207,12 @@ def genprepmlwater(img_yml_path, lab_yml_path,
     """
 
     scene_name = os.path.dirname(img_yml_path).split('/')[-1]
-        
+
     inter_dir = f"{inter_dir}{scene_name}_tmp/"
     os.makedirs(inter_dir, exist_ok=True)
     cog_dir = f"{inter_dir}{scene_name}/"
     os.makedirs(cog_dir, exist_ok=True)
-                    
+
     des_band_refs = {
         "LANDSAT_8": ['blue','green','red','nir','swir1','swir2','pixel_qa'],
         "LANDSAT_7": ['blue','green','red','nir','swir1','swir2','pixel_qa'],
@@ -225,23 +225,27 @@ def genprepmlwater(img_yml_path, lab_yml_path,
     root = setup_logging()
 
     root.info(f"{scene_name} Starting")
-    
+
     try: 
 
         try:
+            
+            # Okay so what i think is going on is that the bands are being added twice, but its not getting the bands from the WOFS!
             root.info(f"{scene_name} Finding & Streaming Image & Labels Yamls")
 
             img_yml = stream_yml(s3_bucket, img_yml_path)
             lab_yml = stream_yml(s3_bucket, lab_yml_path)
             img_sat = img_yml['platform']['code']
             lab_sat = lab_yml['platform']['code']
+            # DEBUG PLS REMOVE
+            lab_sat = 'WOFS_SUMMARY'
 
             root.info(f"img sat: {img_sat} lab sat: {lab_sat}") # img sat: SENTINEL_2 lab sat: SENTINEL_2
             qa_channel = get_qa_channel(img_sat)
             root.info(f"qa channel: {qa_channel}") # qa channel : scene_classification
             des_bands = des_band_refs[img_sat] + des_band_refs[lab_sat]
+            # img sat 
             root.info(f"des bands: {des_bands}") # des bands: ['blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'scene_classification', 'blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'scene_classification']
-            # TODO: Why does this log twice??? 
             root.info(f"{scene_name} Found & access yamls")
         except Exception:
             root.exception(f"{scene_name} Yaml or band files can't be found")
@@ -404,135 +408,6 @@ def genprepmlwater(img_yml_path, lab_yml_path,
                 Attributes:
                     scale_factor:  1.0
                     add_offset:    0.0]
-                Bands data: [<xarray.DataArray (band: 1, y: 10980, x: 10980)>
-                dask.array<open_rasterio-573fbe2c43607b9dba473397662cdaf8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
-                dask.array<open_rasterio-100c3da01d2cd99486bb2ba2cab38200<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
-                dask.array<open_rasterio-c9412ea6f32ae40a79e4edec77cbf8f8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
-                dask.array<open_rasterio-c99129e04ec7ef9962029040d3c5e68a<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
-                dask.array<open_rasterio-d68ab96b386171a66facea4c856838ef<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
-                dask.array<open_rasterio-f2bcf7756e95bf817b81323f34549bea<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
-                dask.array<open_rasterio-70ecfbff0909af3d32036ce71e693943<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
-                dask.array<open_rasterio-573fbe2c43607b9dba473397662cdaf8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
-                dask.array<open_rasterio-100c3da01d2cd99486bb2ba2cab38200<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
-                dask.array<open_rasterio-c9412ea6f32ae40a79e4edec77cbf8f8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
-                dask.array<open_rasterio-c99129e04ec7ef9962029040d3c5e68a<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
-                dask.array<open_rasterio-d68ab96b386171a66facea4c856838ef<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
-                dask.array<open_rasterio-f2bcf7756e95bf817b81323f34549bea<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
-                dask.array<open_rasterio-70ecfbff0909af3d32036ce71e693943<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
-                Coordinates:
-                * band         (band) int64 1
-                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
-                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref  int64 0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0]
-
-            
             '''
             xr_data = load_img(bands_data, bands)
             root.info(f"Xr data: {xr_data}") # <xarray.DataArray>
@@ -555,25 +430,6 @@ def genprepmlwater(img_yml_path, lab_yml_path,
                     scale_factor:  1.0
                     add_offset:    0.0
                     _FillValue:    3.402823466e+38
-                Xr data: <xarray.Dataset>
-                Dimensions:               (x: 10980, y: 10980)
-                Coordinates:
-                * x                     (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05
-                * y                     (y) float64 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
-                    spatial_ref           int64 0
-                Data variables:
-                    blue                  (y, x) float32 1.216e+03 1.225e+03 ... 1.038e+04
-                    green                 (y, x) float32 1.079e+03 1.073e+03 ... 9.84e+03
-                    red                   (y, x) float32 1.03e+03 1.036e+03 ... 9.624e+03
-                    nir                   (y, x) float32 1.01e+03 1.011e+03 ... 9.08e+03
-                    swir1                 (y, x) float32 1.044e+03 1.044e+03 ... 6.252e+03
-                    swir2                 (y, x) float32 1.035e+03 1.035e+03 ... 4.65e+03
-                    scene_classification  (y, x) float32 6.0 6.0 6.0 6.0 6.0 ... 9.0 9.0 9.0 9.0
-                Attributes:
-                    scale_factor:  1.0
-                    add_offset:    0.0
-                    _FillValue:    3.402823466e+38
-
             '''
             bands_data = None
 
@@ -593,7 +449,7 @@ def genprepmlwater(img_yml_path, lab_yml_path,
         try:
             root.info(f"{scene_name} Applying masks") # S2A_MSIL2A_20230307T222751_T60KWF Applying masks
             # VALID REGION MASKS
-            validmask_img = get_valid(xr_data, img_sat) # img nd mask
+            validmask_img = get_valid(xr_data, img_sat) # img nd maskc
             root.info(f"Valid mask img: {validmask_img}")
             validmask_lab = get_valid(xr_data, lab_sat) # water nd mask
             root.info(f"Valid mask lab: {validmask_lab}")
@@ -604,6 +460,7 @@ def genprepmlwater(img_yml_path, lab_yml_path,
             
             # ASSIGN WATER/NON WATER CLASS LABELS
             water_thresh = 50 # 50% persistence in summary
+            # Lets create a PC band, 
             xr_data['pc'] = xr_data.pc.where((xr_data.pc < water_thresh) | (validmask_lab == False), 100) # fix > prob to water
             xr_data['waterclass'] = xr_data.pc.where((xr_data.pc >= water_thresh) | (validmask_lab == False), 0) # fix < prob to no water 
             xr_data = xr_data.drop(['pc'])
