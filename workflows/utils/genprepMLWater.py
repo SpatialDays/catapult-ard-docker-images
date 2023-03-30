@@ -108,7 +108,7 @@ def get_valid(ds, prod):
         )
     elif 'WOFS_SUMMARY' in prod:
         good_quality = (
-            (ds.pc >= 0)
+            (ds.water_wofs >= 0)
         )
     elif 'SENTINEL_1' in prod:
         good_quality = (
@@ -225,7 +225,7 @@ def genprepmlwater(img_yml_path, lab_yml_path,
         "SENTINEL_2": ['blue','green','red','nir','swir1','swir2','scene_classification'],
 #         "SENTINEL_2": ['blue','red','nir','swir1','scene_classification'],
         "SENTINEL_1": ['vv','vh','layovershadow_mask'],
-        "WOFS_SUMMARY": ['pc']}
+        "WOFS_SUMMARY": ['water_wofs']}
 
     root = setup_logging()
 
@@ -284,8 +284,8 @@ def genprepmlwater(img_yml_path, lab_yml_path,
             
             # ASSIGN WATER/NON WATER CLASS LABELS
             water_thresh = 50 # 50% persistence in summary
-            xr_data['pc'] = xr_data.pc.where((xr_data.pc < water_thresh) | (validmask_lab == False), 100) # fix > prob to water
-            xr_data['waterclass'] = xr_data.pc.where((xr_data.pc >= water_thresh) | (validmask_lab == False), 0) # fix < prob to no water 
+            xr_data['pc'] = xr_data.water_wofs.where((xr_data.water_wofs < water_thresh) | (validmask_lab == False), 100) # fix > prob to water
+            xr_data['waterclass'] = xr_data.water_wofs.where((xr_data.water_wofs >= water_thresh) | (validmask_lab == False), 0) # fix < prob to no water 
             xr_data = xr_data.drop(['pc'])
         
             # MASK TO TRAINING SAMPLES W/ IMPUTED ND
