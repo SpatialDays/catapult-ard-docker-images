@@ -7,9 +7,6 @@
 import json
 from workflows.utils.genprepMLWater import genprepmlwater
 import redis 
-def process_scene(json_data):
-    loaded_json = json.loads(json_data)
-    genprepmlwater(**loaded_json)
 
 ##################
 # Job processing #
@@ -46,7 +43,7 @@ if __name__ == "__main__":
                 logger.info(f"Working on {itemstr}")
                 start = datetime.datetime.now().replace(microsecond=0)
                 loaded_json = json.loads(itemstr)
-                process_scene(**loaded_json)
+                genprepmlwater(**loaded_json)
                 end = datetime.datetime.now().replace(microsecond=0)
                 logger.info(f"Total processing time {end - start}")
             else:
