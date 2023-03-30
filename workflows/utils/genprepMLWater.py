@@ -2,7 +2,6 @@ import yaml
 import glob
 import rasterio
 from rasterio.crs import CRS
-# from rasterio.transform import Affine
 from affine import Affine
 import rioxarray
 import xarray as xr
@@ -30,8 +29,8 @@ import rioxarray as rxr
 from sklearn_xarray import wrap
 from sklearn.ensemble import RandomForestClassifier
 
-from . prep_utils import *
-from . dc_import_export import export_xarray_to_geotiff
+from workflows.utils.prep_utils import *
+from workflows.utils.dc_import_export import export_xarray_to_geotiff
 
 
 

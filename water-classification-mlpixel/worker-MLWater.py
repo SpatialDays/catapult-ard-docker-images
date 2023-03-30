@@ -5,7 +5,7 @@
 ################
 
 import json
-from utils.genprepMLWater import genprepmlwater
+from workflows.utils.genprepMLWater import genprepmlwater
 
 def process_scene(json_data):
     loaded_json = json.loads(json_data)
@@ -23,7 +23,8 @@ import datetime
 level = os.getenv("LOGLEVEL", "INFO").upper()
 logging.basicConfig(format="%(asctime)s %(levelname)-8s %(name)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=level)
 
-host = os.getenv("REDIS_SERVICE_HOST", "redis-master")
+host = os.getenv("REDIS_HOST", "redis-master")
+port = int(os.getenv("REDIS_PORT", "30000"))
 q = rediswq.RedisWQ(name="jobMLWater", host=host)
 
 logger = logging.getLogger("worker")

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ard-docker-images-mlwater
+spec:
+  replicas: {{ .Values.numWorkersReplicas }}
+  selector:
+    matchLabels:
+      app: ard-docker-images-mlwater
+  template:
+    metadata:
+      labels:
+        app: ard-docker-images-mlwater
+    spec:
+      containers:
+      - name: s3proxy
+        image: andrewgaul/s3proxy:sha-b5d090d
+        env:
+            - name: S3PROXY_ENDPOINT
+              value: "http://0.0.0.0:80"
+            - name: S3PROXY_AUTHORIZATION
+              value: "none"
+            - name: JCLOUDS_PROVIDER
+              value: "azureblob"
+            - name: JCLOUDS_IDENTITY
+              value: {{ .Values.s3proxy.jcloudsIdentity | quote }}
+            - name: JCLOUDS_ENDPOINT
+              value: {{ .Values.s3proxy.jcloudsEndpoint | quote }}
+            - name: JCLOUDS_CREDENTIAL
+              value: {{ .Values.s3proxy.jcloudsCredential | quote }}
+      - name: ard-docker-images-mlwater
+        image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
+        imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        command: ["python3", "-m","water-classification-mlpixel.worker-MLWater"]     
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            value: "aws-access-key-id"
+          - name: AWS_SECRET_ACCESS_KEY
+            value: "aws-secret-access-key"
+          - name: S3_ENDPOINT
+            value: "http://localhost:80"
+          - name: AWS_DEFAULT_REGION
+            value: "eu-west-2"
+          - name: REDIS_HOST
+            value: {{ .Values.redis.host | quote }}
+          - name: REDIS_PORT
+            value: {{ .Values.redis.port | quote }}
