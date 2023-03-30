@@ -36,10 +36,6 @@ from workflows.utils.dc_import_export import export_xarray_to_geotiff
 def stream_yml(s3_bucket, s3_path):
     return yaml.safe_load(requests.get(f"{os.getenv('S3_ENDPOINT')}/{s3_bucket}/{s3_path}").text)
 
-def get_ref_channel(prod):
-    if ('LANDSAT' in prod) | ('SENTINEL_2' in prod): return 'swir1'
-    elif 'SENTINEL_1' in prod: return 'vv'
-    
 def get_qa_channel(prod):
     if 'LANDSAT' in prod: return 'pixel_qa'
     elif 'SENTINEL_2' in prod: return 'scene_classification'
@@ -108,7 +104,7 @@ def get_valid(ds, prod):
         )
     elif 'WOFS_SUMMARY' in prod:
         good_quality = (
-            (ds.water_wofs >= 0)
+            (ds.pc >= 0)
         )
     elif 'SENTINEL_1' in prod:
         good_quality = (
@@ -223,9 +219,8 @@ def genprepmlwater(img_yml_path, lab_yml_path,
         "LANDSAT_5": ['blue','green','red','nir','swir1','swir2','pixel_qa'],
         "LANDSAT_4": ['blue','green','red','nir','swir1','swir2','pixel_qa'],
         "SENTINEL_2": ['blue','green','red','nir','swir1','swir2','scene_classification'],
-#         "SENTINEL_2": ['blue','red','nir','swir1','scene_classification'],
         "SENTINEL_1": ['vv','vh','layovershadow_mask'],
-        "WOFS_SUMMARY": ['water_wofs']}
+        "WOFS_SUMMARY": ['pc']}
 
     root = setup_logging()
 
@@ -235,33 +230,32 @@ def genprepmlwater(img_yml_path, lab_yml_path,
 
         try:
             root.info(f"{scene_name} Finding & Streaming Image & Labels Yamls")
-            # get ymls directly
+
             img_yml = stream_yml(s3_bucket, img_yml_path)
             lab_yml = stream_yml(s3_bucket, lab_yml_path)
             img_sat = img_yml['platform']['code']
             lab_sat = lab_yml['platform']['code']
-            
-            root.info(f"img sat: {img_sat} lab sat: {lab_sat}")
-            # need to know agnostic ref and qa bands plus all bands from all srcs
-            ref_channel = get_ref_channel(img_sat)
+
+            root.info(f"img sat: {img_sat} lab sat: {lab_sat}") # img sat: SENTINEL_2 lab sat: SENTINEL_2
             qa_channel = get_qa_channel(img_sat)
+            root.info(f"qa channel: {qa_channel}") # qa channel : scene_classification
             des_bands = des_band_refs[img_sat] + des_band_refs[lab_sat]
+            root.info(f"des bands: {des_bands}") # des bands: ?
             root.info(f"{scene_name} Found & access yamls")
-        except:
+        except Exception:
             root.exception(f"{scene_name} Yaml or band files can't be found")
             raise Exception('Streaming Error')
 
         try:
             root.info(f"{scene_name} Loading & Reformatting bands")
-            # LOAD & PREP IMAGE & LABEL DATA
-            #### SHOULD BE LAZY    ####
-            # load all bands into same xr w/ same extent
             paths, bands = get_remote_band_paths(s3_bucket,[img_yml_path,lab_yml_path],des_bands)
+            root.info(f"Paths: {paths} Bands: {bands}")
             bands_data = load_bands(paths)
+            root.info(f"Bands data: {bands_data}")
             xr_data = load_img(bands_data, bands)
+            root.info(f"Xr data: {xr_data}")
             bands_data = None
-            #### SHOULD BE LAZY ^^ ####            
-            # catch s1 + scale + re-fromat dtype
+
             if img_sat == 'SENTINEL_1':
                 att = xr_data.attrs
                 xr_data = xr_data*100
@@ -279,13 +273,19 @@ def genprepmlwater(img_yml_path, lab_yml_path,
             root.info(f"{scene_name} Applying masks")
             # VALID REGION MASKS
             validmask_img = get_valid(xr_data, img_sat) # img nd mask
+            root.info(f"Valid mask img: {validmask_img}")
             validmask_lab = get_valid(xr_data, lab_sat) # water nd mask
+            root.info(f"Valid mask lab: {validmask_lab}")
             validmask_train = validmask_img*validmask_lab # inner true mask
+            
+            root.info(f"xr data: {xr_data}")
+            root.info(f"xr data bands: {xr_data.bands}")
+            root.info(f"xr pc: {xr_data.pc}")
             
             # ASSIGN WATER/NON WATER CLASS LABELS
             water_thresh = 50 # 50% persistence in summary
-            xr_data['pc'] = xr_data.water_wofs.where((xr_data.water_wofs < water_thresh) | (validmask_lab == False), 100) # fix > prob to water
-            xr_data['waterclass'] = xr_data.water_wofs.where((xr_data.water_wofs >= water_thresh) | (validmask_lab == False), 0) # fix < prob to no water 
+            xr_data['pc'] = xr_data.pc.where((xr_data.pc < water_thresh) | (validmask_lab == False), 100) # fix > prob to water
+            xr_data['waterclass'] = xr_data.pc.where((xr_data.pc >= water_thresh) | (validmask_lab == False), 0) # fix < prob to no water 
             xr_data = xr_data.drop(['pc'])
         
             # MASK TO TRAINING SAMPLES W/ IMPUTED ND
