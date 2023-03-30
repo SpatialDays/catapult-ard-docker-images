@@ -19,7 +19,6 @@ import uuid
 import geopandas as gpd
 import rasterio
 import rasterio.features
-import gdal
 import gc
 import traceback
 import requests
@@ -241,6 +240,8 @@ def genprepmlwater(img_yml_path, lab_yml_path,
             lab_yml = stream_yml(s3_bucket, lab_yml_path)
             img_sat = img_yml['platform']['code']
             lab_sat = lab_yml['platform']['code']
+            
+            root.info(f"img sat: {img_sat} lab sat: {lab_sat}")
             # need to know agnostic ref and qa bands plus all bands from all srcs
             ref_channel = get_ref_channel(img_sat)
             qa_channel = get_qa_channel(img_sat)
