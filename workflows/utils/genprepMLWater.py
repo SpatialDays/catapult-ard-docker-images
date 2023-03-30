@@ -240,20 +240,341 @@ def genprepmlwater(img_yml_path, lab_yml_path,
             qa_channel = get_qa_channel(img_sat)
             root.info(f"qa channel: {qa_channel}") # qa channel : scene_classification
             des_bands = des_band_refs[img_sat] + des_band_refs[lab_sat]
-            root.info(f"des bands: {des_bands}") # des bands: ?
+            root.info(f"des bands: {des_bands}") # des bands: ['blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'scene_classification', 'blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'scene_classification']
+            # TODO: Why does this log twice??? 
             root.info(f"{scene_name} Found & access yamls")
         except Exception:
             root.exception(f"{scene_name} Yaml or band files can't be found")
             raise Exception('Streaming Error')
 
         try:
-            root.info(f"{scene_name} Loading & Reformatting bands")
+            root.info(f"{scene_name} Loading & Reformatting bands") # S2A_MSIL2A_20230307T222751_T60KWF Loading & Reformatting bands
             paths, bands = get_remote_band_paths(s3_bucket,[img_yml_path,lab_yml_path],des_bands)
             root.info(f"Paths: {paths} Bands: {bands}")
+            '''
+            Paths
+                [
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B02_10m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B03_10m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B04_10m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B08_10m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B11_20m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B12_20m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_SCL_20m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B02_10m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B03_10m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B04_10m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B08_10m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B11_20m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_B12_20m.tif',
+                'http://localhost:80/ard-bucket/common_sensing/fiji/sentinel_2/S2A_MSIL2A_20230307T222751_T60KWF/S2A_MSIL2A_20230307T222751_T60KWF_SCL_20m.tif'
+                ]
+            
+            Bands: ['blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'scene_classification', 'blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'scene_classification']
+            '''
+            
             bands_data = load_bands(paths)
-            root.info(f"Bands data: {bands_data}")
+            root.info(f"Bands data: {bands_data}") # [<xarray.DataArray (band: 1, y: 10980, x: 10980)>
+            '''
+            Bands data: [<xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                
+                dask.array<open_rasterio-573fbe2c43607b9dba473397662cdaf8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-100c3da01d2cd99486bb2ba2cab38200<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-c9412ea6f32ae40a79e4edec77cbf8f8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-c99129e04ec7ef9962029040d3c5e68a<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-d68ab96b386171a66facea4c856838ef<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-f2bcf7756e95bf817b81323f34549bea<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-70ecfbff0909af3d32036ce71e693943<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-573fbe2c43607b9dba473397662cdaf8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-100c3da01d2cd99486bb2ba2cab38200<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-c9412ea6f32ae40a79e4edec77cbf8f8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-c99129e04ec7ef9962029040d3c5e68a<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-d68ab96b386171a66facea4c856838ef<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-f2bcf7756e95bf817b81323f34549bea<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-70ecfbff0909af3d32036ce71e693943<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0]
+                Bands data: [<xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-573fbe2c43607b9dba473397662cdaf8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-100c3da01d2cd99486bb2ba2cab38200<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-c9412ea6f32ae40a79e4edec77cbf8f8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-c99129e04ec7ef9962029040d3c5e68a<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-d68ab96b386171a66facea4c856838ef<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-f2bcf7756e95bf817b81323f34549bea<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-70ecfbff0909af3d32036ce71e693943<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-573fbe2c43607b9dba473397662cdaf8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-100c3da01d2cd99486bb2ba2cab38200<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-c9412ea6f32ae40a79e4edec77cbf8f8<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 10980, x: 10980)>
+                dask.array<open_rasterio-c99129e04ec7ef9962029040d3c5e68a<this-array>, shape=(1, 10980, 10980), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-d68ab96b386171a66facea4c856838ef<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-f2bcf7756e95bf817b81323f34549bea<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0, <xarray.DataArray (band: 1, y: 5490, x: 5490)>
+                dask.array<open_rasterio-70ecfbff0909af3d32036ce71e693943<this-array>, shape=(1, 5490, 5490), dtype=float32, chunksize=(1, 2000, 2000), chunktype=numpy.ndarray>
+                Coordinates:
+                * band         (band) int64 1
+                * x            (x) float64 5e+05 5e+05 5e+05 ... 6.097e+05 6.098e+05 6.098e+05
+                * y            (y) float64 8.1e+06 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref  int64 0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0]
+
+            
+            '''
             xr_data = load_img(bands_data, bands)
-            root.info(f"Xr data: {xr_data}")
+            root.info(f"Xr data: {xr_data}") # <xarray.DataArray>
+            '''
+            Xr data: <xarray.Dataset>
+                Dimensions:               (x: 10980, y: 10980)
+                Coordinates:
+                * x                     (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05
+                * y                     (y) float64 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref           int64 0
+                Data variables:
+                    blue                  (y, x) float32 1.216e+03 1.225e+03 ... 1.038e+04
+                    green                 (y, x) float32 1.079e+03 1.073e+03 ... 9.84e+03
+                    red                   (y, x) float32 1.03e+03 1.036e+03 ... 9.624e+03
+                    nir                   (y, x) float32 1.01e+03 1.011e+03 ... 9.08e+03
+                    swir1                 (y, x) float32 1.044e+03 1.044e+03 ... 6.252e+03
+                    swir2                 (y, x) float32 1.035e+03 1.035e+03 ... 4.65e+03
+                    scene_classification  (y, x) float32 6.0 6.0 6.0 6.0 6.0 ... 9.0 9.0 9.0 9.0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0
+                    _FillValue:    3.402823466e+38
+                Xr data: <xarray.Dataset>
+                Dimensions:               (x: 10980, y: 10980)
+                Coordinates:
+                * x                     (x) float64 5e+05 5e+05 5e+05 ... 6.098e+05 6.098e+05
+                * y                     (y) float64 8.1e+06 8.1e+06 ... 7.99e+06 7.99e+06
+                    spatial_ref           int64 0
+                Data variables:
+                    blue                  (y, x) float32 1.216e+03 1.225e+03 ... 1.038e+04
+                    green                 (y, x) float32 1.079e+03 1.073e+03 ... 9.84e+03
+                    red                   (y, x) float32 1.03e+03 1.036e+03 ... 9.624e+03
+                    nir                   (y, x) float32 1.01e+03 1.011e+03 ... 9.08e+03
+                    swir1                 (y, x) float32 1.044e+03 1.044e+03 ... 6.252e+03
+                    swir2                 (y, x) float32 1.035e+03 1.035e+03 ... 4.65e+03
+                    scene_classification  (y, x) float32 6.0 6.0 6.0 6.0 6.0 ... 9.0 9.0 9.0 9.0
+                Attributes:
+                    scale_factor:  1.0
+                    add_offset:    0.0
+                    _FillValue:    3.402823466e+38
+
+            '''
             bands_data = None
 
             if img_sat == 'SENTINEL_1':
@@ -270,7 +591,7 @@ def genprepmlwater(img_yml_path, lab_yml_path,
             raise Exception('Data formatting error')
 
         try:
-            root.info(f"{scene_name} Applying masks")
+            root.info(f"{scene_name} Applying masks") # S2A_MSIL2A_20230307T222751_T60KWF Applying masks
             # VALID REGION MASKS
             validmask_img = get_valid(xr_data, img_sat) # img nd mask
             root.info(f"Valid mask img: {validmask_img}")
@@ -286,7 +607,7 @@ def genprepmlwater(img_yml_path, lab_yml_path,
             water_thresh = 50 # 50% persistence in summary
             xr_data['pc'] = xr_data.pc.where((xr_data.pc < water_thresh) | (validmask_lab == False), 100) # fix > prob to water
             xr_data['waterclass'] = xr_data.pc.where((xr_data.pc >= water_thresh) | (validmask_lab == False), 0) # fix < prob to no water 
-            xr_data = xr_data.drop(['pc'])
+            # xr_data = xr_data.drop(['pc'])
         
             # MASK TO TRAINING SAMPLES W/ IMPUTED ND
             train_data = xr_data # dup as use img 4 implementation later
