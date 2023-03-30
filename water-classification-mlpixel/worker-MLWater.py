@@ -17,7 +17,6 @@ def process_scene(json_data):
 
 import os
 import logging
-import rediswq
 import datetime
 
 if __name__ == "__main__":

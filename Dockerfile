@@ -21,6 +21,10 @@ RUN pip install xarray
 RUN pip install geopandas
 RUN pip install pyproj==2.6.1.post1
 RUN pip install sentinelsat
+RUN pip install rioxarray
+RUN pip install salem
+RUN pip install sklearn-xarray
+RUN pip install dask
 RUN apt-get install libgdal-dev -y #install just to get the dependencies
 RUN apt-get install cmake -y
 RUN apt-get install libsqlite3-dev -y
@@ -62,9 +66,6 @@ RUN chmod +x update_snap.sh
 RUN ./update_snap.sh
 COPY workflows/utils/s1am/snap/bin/gpt.vmoptions /opt/snap/bin
 COPY workflows/utils/s1am/snap/etc/snap.auxdata.properties /opt/snap/etc
-RUN pip install rioxarray
-RUN pip install salem
-RUN pip install sklearn-xarray
-RUN pip install dask
+
 COPY . /app
 WORKDIR /app
