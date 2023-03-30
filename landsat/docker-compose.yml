@@ -7,10 +7,10 @@ services:
     network_mode: host
     environment:
       - REDIS_HOST=localhost
-      - REDIS_PORT=6379
-      - AWS_ACCESS_KEY_ID=
-      - AWS_SECRET_ACCESS_KEY=
-      - AWS_DEFAULT_REGION=
-      - S3_ENDPOINT=
-      - S3_BUCKET=
+      - REDIS_PORT=30000
+      - AWS_ACCESS_KEY_ID=s3-proxy-not-needed
+      - AWS_SECRET_ACCESS_KEY=s3-proxy-not-needed
+      - AWS_DEFAULT_REGION=eu-west-2
+      - S3_ENDPOINT=http://localhost:30003
+      - S3_BUCKET=ard-bucket
     command: [ "python3", "-m","landsat.worker-LS" ]

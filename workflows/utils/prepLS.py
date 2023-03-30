@@ -55,46 +55,78 @@ def extract_scene(scene_path, target_folder):
 
 
 def band_name_landsat(prod_path):
-    if "LE07_" in prod_path or "LT04_" in prod_path or "LT05_" in prod_path:
-        return band_name_l7(prod_path)
-    elif "LC08_" in prod_path:
-        return band_name_l8(prod_path)
+    landsat_registry = {
+        'LE04': 'landsat_4',
+        'LE05': 'landsat_5',
+        'LE07': 'landsat_7',
+        'LC04': 'landsat_4',
+        'LC05': 'landsat_5',
+        'LT05': 'landsat_5',
+        'LT04': 'landsat_4',
+        'LC07': 'landsat_7',
+        'LC08': 'landsat_8',
+        'LE08': 'landsat_8'
+    }
+
+    for key in landsat_registry.keys():
+        if key in prod_path:
+            return band_name_l8(prod_path)
     else:
         logging.warning(f"unknown landsat product {prod_path}")
         raise Exception(f"unknown landsat product {prod_path}")
 
 
-def band_name_l7(prod_path):
-    """
-        Determine l7 band of individual product from product name
-        from path to specific product file
+# def band_name_l7(prod_path):
+#     """
+#         Determine l7 band of individual product from product name
+#         from path to specific product file
 
-        Note this is used for Landsat 4, 5, and 7 as the bands we care about are the same in all three cases.
-        """
+#         Note this is used for Landsat 4, 5, and 7 as the bands we care about are the same in all three cases.
+#         """
 
-    prod_name = os.path.basename(prod_path)
-    parts = prod_name.split('_')
-    prod_name = f"{parts[-2]}_{parts[-1][:-4]}"
+#     prod_name = os.path.basename(prod_path)
+#     parts = prod_name.split('_')
+#     prod_name = f"{parts[-2]}_{parts[-1][:-4]}"
 
-    logging.debug("Product name is: {}".format(prod_name))
+#     # convert to lower
+#     prod_name = prod_name.lower()
+#     logging.debug("Product name is: {}".format(prod_name))
 
-    prod_map = {
-        "bt_band6": 'brightness_temperature_1',
-        "pixel_qa": 'pixel_qa',
-        "cloud_qa": 'sr_cloud_qa',
-        "radsat_qa": 'radsat_qa',
-        "atmos_opacity": 'sr_atmos_opacity',
-        "sr_band1": 'blue',
-        "sr_band2": 'green',
-        "sr_band3": 'red',
-        "sr_band4": 'nir',
-        "sr_band5": 'swir1',
-        "sr_band7": 'swir2',
-    }
+#     # old
+#     # prod_map = {
+#     #     "bt_band6": 'brightness_temperature_1',
+#     #     "pixel_qa": 'pixel_qa',
+#     #     "cloud_qa": 'sr_cloud_qa',
+#     #     "radsat_qa": 'radsat_qa',
+#     #     "atmos_opacity": 'sr_atmos_opacity',
+#     #     "sr_band1": 'blue',
+#     #     "sr_band2": 'green',
+#     #     "sr_band3": 'red',
+#     #     "sr_band4": 'nir',
+#     #     "sr_band5": 'swir1',
+#     #     "sr_band7": 'swir2',
+#     # }
+#     prod_map = {
+#         # "bt_band6": 'brightness_temperature_1',
+#         "qa_pixel": 'pixel_qa',
+#         # "cloud_qa": 'sr_cloud_qa',
+#         "qa_radsat": 'radsat_qa',
+#         # "atmos_opacity": 'sr_atmos_opacity',
+#         "b1": 'coastal_aerosol',
+#         "b2": 'blue',
+#         "b3": 'green',
+#         "b4": 'red',
+#         "b5": 'nir',
+#         "b6": 'swir1',
+#         "b7": 'swir2',
+#     }
+#     if prod_name in prod_map:
+#         layer_name = prod_map[prod_name]
+#     else:
+#         layer_name = "unknown"
 
-    layer_name = prod_map[prod_name]
+#     return layer_name
 
-    return layer_name
 
 
 def band_name_l8(prod_path):
