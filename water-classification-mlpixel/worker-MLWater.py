@@ -22,7 +22,6 @@ if __name__ == "__main__":
     level = os.getenv("LOGLEVEL", "INFO").upper()
     logging.basicConfig(format="%(asctime)s %(levelname)-8s %(name)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S",
                         level=level)
-    logging.getLogger().addHandler(logging.StreamHandler())
     logging_file_handler = logging.FileHandler(log_file_path)
     logging.getLogger().addHandler(logging_file_handler)
     logger = logging.getLogger("worker")

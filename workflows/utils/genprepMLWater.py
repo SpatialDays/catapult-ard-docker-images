@@ -600,14 +600,13 @@ def genprepmlwater(img_yml_path, lab_yml_path,
             validmask_train = validmask_img*validmask_lab # inner true mask
             
             root.info(f"xr data: {xr_data}")
-            root.info(f"xr data bands: {xr_data.bands}")
             root.info(f"xr pc: {xr_data.pc}")
             
             # ASSIGN WATER/NON WATER CLASS LABELS
             water_thresh = 50 # 50% persistence in summary
             xr_data['pc'] = xr_data.pc.where((xr_data.pc < water_thresh) | (validmask_lab == False), 100) # fix > prob to water
             xr_data['waterclass'] = xr_data.pc.where((xr_data.pc >= water_thresh) | (validmask_lab == False), 0) # fix < prob to no water 
-            # xr_data = xr_data.drop(['pc'])
+            xr_data = xr_data.drop(['pc'])
         
             # MASK TO TRAINING SAMPLES W/ IMPUTED ND
             train_data = xr_data # dup as use img 4 implementation later
