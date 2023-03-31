@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ard-docker-images-landsat8
+  name: ard-docker-images-landsat
 spec:
   replicas: {{ .Values.numWorkerReplicasLandsat }}
   selector:
     matchLabels:
-      app: ard-docker-images-landsat8
+      app: ard-docker-images-landsat
   template:
     metadata:
       labels:
-        app: ard-docker-images-landsat8
+        app: ard-docker-images-landsat
     spec:
       containers:
       - name: s3proxy
@@ -28,7 +28,7 @@ spec:
               value: {{ .Values.s3proxy.jcloudsEndpoint | quote }}
             - name: JCLOUDS_CREDENTIAL
               value: {{ .Values.s3proxy.jcloudsCredential | quote }}
-      - name: ard-docker-images-landsat8
+      - name: ard-docker-images-landsat
         image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
         imagePullPolicy: {{ $.Values.image.pullPolicy }}
         command: [ "python3", "-m","landsat.worker-LS" ]
