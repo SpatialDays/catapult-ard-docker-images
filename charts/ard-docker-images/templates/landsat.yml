@@ -28,3 +28,20 @@ spec:
               value: {{ .Values.s3proxy.jcloudsEndpoint | quote }}
             - name: JCLOUDS_CREDENTIAL
               value: {{ .Values.s3proxy.jcloudsCredential | quote }}
+      - name: ard-docker-images-landsat
+        image: {{ $.Values.image.repository }}:{{ $.Values.image.tag }}
+        imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        command: [ "python3", "-m","landsat.worker-LS" ]
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            value: "aws-access-key-id"
+          - name: AWS_SECRET_ACCESS_KEY
+            value: "aws-secret-access-key"
+          - name: S3_ENDPOINT
+            value: "http://localhost:80"
+          - name: AWS_DEFAULT_REGION
+            value: "eu-west-2"
+          - name: REDIS_HOST
+            value: {{ .Values.redis.host | quote }}
+          - name: REDIS_PORT
+            value: {{ .Values.redis.port | quote }}
