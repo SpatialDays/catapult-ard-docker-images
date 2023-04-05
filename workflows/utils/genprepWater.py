@@ -256,7 +256,7 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
 
             # rescale bands using scale_and_clip_dataarray function, only not for the last item in the list
             logging.info(f"{scene_name} Rescaling bands to old collection 1 style")
-            o_bands_data = [ scale_and_clip_dataarray(i, scale_factor=0.275, add_offset=-2000,clip_range=None, valid_range=(0, 10000))  for i in o_bands_data[:-1] ] + [o_bands_data[-1]]
+            o_bands_data = [ scale_and_clip_dataarray(i, scale_factor=0.0000275, add_offset=-0.2,clip_range=None, valid_range=(0, 10000))  for i in o_bands_data[:-1] ] + [o_bands_data[-1]]
 
             bands_data = xr.merge([rename_bands(bd, des_bands, i) for i,bd in enumerate(o_bands_data)]).rename({'band': 'time'}) # ensure band names & dims consistent
             bands_data = bands_data.assign_attrs(o_bands_data[0].attrs) # crs etc. needed later
