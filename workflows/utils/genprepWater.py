@@ -155,6 +155,32 @@ def resamp_bands(xr, xrs):
     else:
         return xr.interp(x=xrs[0]['x'], y=xrs[0]['y'])
     
+def scale_and_clip_dataarray(dataarray: xr.DataArray, *, scale_factor=1, add_offset=0, clip_range=None,
+                             valid_range=None, new_nodata=-999, new_dtype='int16'):
+    orig_attrs = dataarray.attrs
+    logging.info(f"orig_attrs are {orig_attrs}")
+    # nodata = dataarray.attrs['nodata']
+    nodata = 0
+    mask = dataarray.data == nodata
+
+    # add another mask here for if data > 10000 then also make that nodata
+    dataarray = dataarray * scale_factor + add_offset
+
+    if clip_range is not None:
+        dataarray = dataarray.clip(*clip_range)
+
+    dataarray = dataarray.astype(new_dtype)
+
+    dataarray.data[mask] = new_nodata
+    if valid_range is not None:
+        valid_min, valid_max = valid_range
+        dataarray = dataarray.where(dataarray >= valid_min, new_nodata)
+        dataarray = dataarray.where(dataarray <= valid_max, new_nodata)
+    dataarray.attrs = orig_attrs
+    dataarray.attrs['nodata'] = new_nodata
+
+    return dataarray
+    
     
 def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='common_sensing/fiji/wofsdefault/', inter_dir='../tmp/data/intermediate/', aoi_mask=False, **kwargs):
     """
@@ -227,6 +253,11 @@ def per_scene_wofs(optical_yaml_path, s3_source=True, s3_bucket='', s3_dir='comm
 #             o_bands_data = [ xr.open_rasterio(inter_dir + yml_meta['image']['bands'][b]['path'], chunks={'band': 1, 'x': 1024, 'y': 1024}) for b in des_bands ] # dask can't be used here due to resample req
             o_bands_data = [ xr.open_rasterio(inter_dir + yml_meta['image']['bands'][b]['path']) for b in des_bands ] # loading
             o_bands_data = [ resamp_bands(i, o_bands_data) for i in o_bands_data ]
+
+            # rescale bands using scale_and_clip_dataarray function, only not for the last item in the list
+            logging.info(f"{scene_name} Rescaling bands to old collection 1 style")
+            o_bands_data = [ scale_and_clip_dataarray(i, scale_factor=0.275, add_offset=-2000,clip_range=None, valid_range=(0, 10000))  for i in o_bands_data[:-1] ] + [o_bands_data[-1]]
+
             bands_data = xr.merge([rename_bands(bd, des_bands, i) for i,bd in enumerate(o_bands_data)]).rename({'band': 'time'}) # ensure band names & dims consistent
             bands_data = bands_data.assign_attrs(o_bands_data[0].attrs) # crs etc. needed later
             for i in o_bands_data: i.close()

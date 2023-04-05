@@ -80,7 +80,7 @@ def NDWI(data, normalize=False, band_pair=0):
     return ndwi
 
 def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='latitude',
-                  time_coord='time', no_data=0, mosaic=False, enforce_float64=False):
+                  time_coord='time', no_data=-9999, mosaic=False, enforce_float64=False):
     """
     Description:
       Performs WOfS algorithm on given dataset.
