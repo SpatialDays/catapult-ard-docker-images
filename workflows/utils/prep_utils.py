@@ -107,21 +107,37 @@ def clean_up(work_dir: str) -> None:
         shutil.rmtree(work_dir)
 
 
+def get_available_regions(region, s3_bucket):
+    """Gets a list of the regions which we have external dems for"""
+
+    client = s3_create_client(s3_bucket)[0]
+    result = client.list_objects(Bucket=s3_bucket, Prefix='common_sensing/ancillary_products/SRTM1Sec/', Delimiter='/')
+    contents = result.get('Contents')
+    available_regions = []
+    for dir in contents:
+        dem = dir.get('Key').split('/')[-1]
+        region = dem.replace('SRTM30_', '').replace('.tif', '').split('_')[0]
+        if region not in available_regions:
+            available_regions.append(region.lower())
+
+    return available_regions
+
+
 # Check if external DEMs need to be downloaded, and download them if necessary
 def download_external_dems(region, in_scene, scene_name, tmp_inter_dir, s3_bucket, root):
 
-    avaliable_regions = ['fiji', 'vanuatu', 'solomon']  # TO DO - MAKE THIS AN ENV VAR (see also raw2ard.py)
+    # gets list of regions which we have external dems for
+    available_regions = get_available_regions(region, s3_bucket)
 
-    logging.info(f'REGION LOWER: {region.lower()}')
+    region_name = region.lower()
 
-    if region.lower() in avaliable_regions:
+    # if dem_avaliable:
+    if region.lower() in available_regions:
 
-        region_name = region.lower()  # .capitalize()
+        region_name = region.lower()
         logging.info(f'REGION NAME: {region_name}')
 
         if region_name.lower() == 'fiji':
-
-            logging.info(f'CREATING EXT DEM PATHS FOR {region_name}')
 
             # Set the paths to the external DEMs to be downloaded
             ext_dem_path_east = f"common_sensing/ancillary_products/SRTM1Sec/SRTM30_{region_name.capitalize()}_E.tif"
@@ -162,7 +178,7 @@ def download_external_dems(region, in_scene, scene_name, tmp_inter_dir, s3_bucke
         return ext_dem_path_local_list
 
     else:
-        logging.info('RETURNING NONE => WILL USE SNAP DEMS')
+        logging.info(f'No external dem found for region "{region_name}" proceeding with snap dem')
         return None  # no external dems => will use snap defaults
 
 

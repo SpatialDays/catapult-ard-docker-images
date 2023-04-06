@@ -248,10 +248,10 @@ class Raw2Ard:
             snap_gpt = os.getenv("GPT_PATH", '/opt/snap/bin/gpt')  # set env var for testing or use default
             int_graph_1 = 'workflows/utils/cs_s1_pt1_bnr_Orb_Cal_ML.xml'
 
-            # find out which region we're looking at, for discovering external dems (if any)
-            avaliable_regions = ['fiji', 'vanuatu', 'solomon']  # TO DO - MAKE THIS AN ENV VAR (see also prep_utils.download_external_dems())
+            # find which regions we have external dems for
+            available_regions = get_available_regions(region, s3_bucket)
 
-            if region.lower() in avaliable_regions:
+            if region.lower() in available_regions:
                 if region.lower() == 'fiji':
                     # find out if the image is in east or west and use that dem
                     logging.info('THE META AOI - TO FIND LONGITUDE')
