@@ -32,7 +32,7 @@ from .dc_utilities import create_default_clean_mask
 import argparse
 import os
 import collections
-import gdal
+from osgeo import gdal
 from datetime import datetime
 
 # Author: KMF

@@ -1,4 +1,3 @@
-
 import uuid
 import requests
 import glob
@@ -8,6 +7,8 @@ from dateutil.parser import parse
 import tarfile
 from workflows.utils.prep_utils import *
 from typing import List
+import shutil
+import rioxarray as rxr
 
 
 def download_scene(landsat_download_url: str, target_folder: str = "/tmp/data/download"):
@@ -55,84 +56,97 @@ def extract_scene(scene_path, target_folder):
 
 
 def band_name_landsat(prod_path):
-    landsat_registry = {
-        'LE04': 'landsat_4',
-        'LE05': 'landsat_5',
-        'LE07': 'landsat_7',
-        'LC04': 'landsat_4',
-        'LC05': 'landsat_5',
-        'LT05': 'landsat_5',
-        'LT04': 'landsat_4',
-        'LC07': 'landsat_7',
-        'LC08': 'landsat_8',
-        'LE08': 'landsat_8'
-    }
-
-    for key in landsat_registry.keys():
-        if key in prod_path:
-            return band_name_l8(prod_path)
+    # E: ETM+, T: TIRS/TM
+    if "LE07_" in prod_path or "LT04_" in prod_path or "LT05_" in prod_path:
+        return band_name_l7(prod_path)
+    # C: OLI+TIRS
+    elif "LC08_" in prod_path:
+        return band_name_l8(prod_path)
     else:
         logging.warning(f"unknown landsat product {prod_path}")
         raise Exception(f"unknown landsat product {prod_path}")
 
 
-# def band_name_l7(prod_path):
-#     """
-#         Determine l7 band of individual product from product name
-#         from path to specific product file
+def band_name_l7(prod_path):
+    """
+        Determine l7 band of individual product from product name
+        from path to specific product file
 
-#         Note this is used for Landsat 4, 5, and 7 as the bands we care about are the same in all three cases.
-#         """
+        Note this is used for Landsat 4, 5, and 7 as the bands we care about are the same in all three cases.
+        """
+    prod_name = os.path.basename(prod_path)
+    logging.debug(f"Full name: {prod_name}")
+    parts = prod_name.split('_')
+    prod_name = f"{parts[-2]}_{parts[-1][:-4]}".lower()
+    logging.debug(f"Parts name: {prod_name}")
 
-#     prod_name = os.path.basename(prod_path)
-#     parts = prod_name.split('_')
-#     prod_name = f"{parts[-2]}_{parts[-1][:-4]}"
+    # Original Naming:
+    # if prod_name[:3] == "t1_" \
+    #         or prod_name[:3] == "t2_" \
+    #         or prod_name[:3] == "sr_" \
+    #         or prod_name[:3] == "bt_" \
+    #         or prod_name[:3] == "st":
+    #     prod_name = prod_name[3:]
 
-#     # convert to lower
-#     prod_name = prod_name.lower()
-#     logging.debug("Product name is: {}".format(prod_name))
+    if prod_name[:3] == "t1_" \
+            or prod_name[:3] == "t2_" :
+        prod_name = prod_name[3:]
+    logging.debug("Product name is: {}".format(prod_name))
+    
 
-#     # old
-#     # prod_map = {
-#     #     "bt_band6": 'brightness_temperature_1',
-#     #     "pixel_qa": 'pixel_qa',
-#     #     "cloud_qa": 'sr_cloud_qa',
-#     #     "radsat_qa": 'radsat_qa',
-#     #     "atmos_opacity": 'sr_atmos_opacity',
-#     #     "sr_band1": 'blue',
-#     #     "sr_band2": 'green',
-#     #     "sr_band3": 'red',
-#     #     "sr_band4": 'nir',
-#     #     "sr_band5": 'swir1',
-#     #     "sr_band7": 'swir2',
-#     # }
-#     prod_map = {
-#         # "bt_band6": 'brightness_temperature_1',
-#         "qa_pixel": 'pixel_qa',
-#         # "cloud_qa": 'sr_cloud_qa',
-#         "qa_radsat": 'radsat_qa',
-#         # "atmos_opacity": 'sr_atmos_opacity',
-#         "b1": 'coastal_aerosol',
-#         "b2": 'blue',
-#         "b3": 'green',
-#         "b4": 'red',
-#         "b5": 'nir',
-#         "b6": 'swir1',
-#         "b7": 'swir2',
-#     }
-#     if prod_name in prod_map:
-#         layer_name = prod_map[prod_name]
-#     else:
-#         layer_name = "unknown"
+    # Level-1 Data Bands
+        # prod_map = {
+        #     "qa_pixel": 'pixel_qa',
+        #     "cloud_qa": 'sr_cloud_qa',
+        #     "qa_radsat": 'radsat_qa',
+        #     "atmos_opacity": 'sr_atmos_opacity',
+        #     "b1": 'blue',
+        #     "b2": 'green',
+        #     "b3": 'red',
+        #     "b4": 'nir',
+        #     "b5": 'swir1',
+        #     "vcid_1": 'thermal_1',
+        #     "vcid_2": 'thermal_2',
+        #     "b7": 'swir2',
+        #     "b8": 'panchromatic'
+        # }
 
-#     return layer_name
+    # Level-2 Data Bands - including ST and SR bands (both included in SP processing level)
+    prod_map = {
+        "qa_pixel": 'pixel_qa',
+        "cloud_qa": 'sr_cloud_qa',
+        "qa_radsat": 'radsat_qa',
+        "atmos_opacity": 'sr_atmos_opacity',
+        "sr_b1": 'blue',
+        "sr_b2": 'green',
+        "sr_b3": 'red',
+        "sr_b4": 'nir',
+        "sr_b5": 'swir1',
+        "sr_b6": 'thermal',
+        "sr_b7": 'swir2',
+        "st_b6": 'st_b6',
+        "st_atran": 'st_atran',
+        "st_cdist": 'st_cdist',
+        "st_drad": 'st_drad',
+        "st_emis": 'st_emis',
+        "st_emsd": 'st_emsd',
+        "st_qa": 'st_qa',
+        "st_trad": 'st_trad',
+        "st_urad": 'st_urad'
+    }
 
+
+    layer_name = prod_map[prod_name]
+    logging.debug(f"Layer name is: {layer_name}")
+
+    return layer_name
 
 
 def band_name_l8(prod_path):
     """
     Determine l8 band of individual product from product name
-    from path to specific product file
+    from path to specific product file. Band names are formatted
+    for Collection2 / Level2 data. 
     """
 
     prod_name = os.path.basename(prod_path)
@@ -147,42 +161,156 @@ def band_name_l8(prod_path):
 
     logging.debug("Product name is: {}".format(prod_name))
 
+    # #Level-1 Data Bands
+    # prod_map = {
+    #     "pixel_qa": 'pixel_qa',
+    #     "radsat_qa": 'radsat_qa',
+    #     # "aerosol": 'sr_aerosol',
+    #     "band1": 'coastal_aerosol',
+    #     "band2": 'blue',
+    #     "band3": 'green',
+    #     "band4": 'red',
+    #     "band5": 'nir',
+    #     "band6": 'swir1',
+    #     "band7": 'swir2',
+    #     "band8": 'panchromatic',
+    #     "band9": 'cirrus',
+    #     "band10": 'brightness_temperature_1',
+    #     "band11": 'brightness_temperature_2',
+    #     "b1": 'coastal_aerosol',
+    #     "b2": 'blue',
+    #     "b3": 'green',
+    #     "b4": 'red',
+    #     "b5": 'nir',
+    #     "b6": 'swir1',
+    #     "b7": 'swir2',
+    #     "b8": 'panchromatic',
+    #     "b9": 'cirrus',
+    #     "b10": 'brightness_temperature_1',
+    #     "b11": 'brightness_temperature_2',
+    #     "qa_radsat": 'radsat_qa',
+    #     "qa_pixel": 'pixel_qa',
+    # }
+
+    #Level-2 Data Bands
     prod_map = {
         "pixel_qa": 'pixel_qa',
         "radsat_qa": 'radsat_qa',
-        # "aerosol": 'sr_aerosol',
-        "band1": 'coastal_aerosol',
-        "band2": 'blue',
-        "band3": 'green',
-        "band4": 'red',
-        "band5": 'nir',
-        "band6": 'swir1',
+        "band1": 'blue',
+        "band2": 'green',
+        "band3": 'red',
+        "band4": 'nir',
+        "band5": 'swir1',
+        "band6": 'thermal',
         "band7": 'swir2',
-        "band8": 'panchromatic',
-        "band9": 'cirrus',
-        "band10": 'brightness_temperature_1',
-        "band11": 'brightness_temperature_2',
-        "b1": 'coastal_aerosol',
-        "b2": 'blue',
-        "b3": 'green',
-        "b4": 'red',
-        "b5": 'nir',
-        "b6": 'swir1',
+        "b1": 'blue',
+        "b2": 'green',
+        "b3": 'red',
+        "b4": 'nir',
+        "b5": 'swir1',
+        "b6": 'thermal',
         "b7": 'swir2',
-        "b8": 'panchromatic',
-        "b9": 'cirrus',
-        "b10": 'brightness_temperature_1',
-        "b11": 'brightness_temperature_2',
         "qa_radsat": 'radsat_qa',
         "qa_pixel": 'pixel_qa',
+        "qa_aerosol": 'aerosol_qa'
     }
 
     if prod_name in prod_map:
         layer_name = prod_map[prod_name]
+        logging.debug(f"Layer name is: {layer_name}")
+
     else:
         layer_name = "unknown"
 
     return layer_name
+
+def scale_landsat_l2(untar_dir, scale_dir, new_dtype='float32'):
+    """
+    Apply scale factor to Landsat Level-2 Surface Reflectance + Surface Temperature Data
+    Surface Reflectance: Scale factor of 0.0000275 + offset of -0.2
+    Surface Temperature: Scale factor of 0.00341802 + offset of 149.0
+    https://www.usgs.gov/faqs/why-are-fill-values-and-scaling-factors-landsat-collection-2-level-2-products-different-those
+
+    Typical values for landsat surface reflectance should be between 0 and 1 with some values over 1.
+
+    Note: Check on assigning new data type of float32 and converting to COG multiple times.
+    """
+    # All the files in the directory (includes QA bands and xml file)
+    filenames = glob.glob(f"{untar_dir}/*")
+
+    # Variable scale factors for supplementary ST bands
+    scale_factor_map = {
+            "st_trad": 0.001,
+            "st_urad": 0.001,
+            "st_drad": 0.001,
+            "st_atran": 0.0001, 
+            "st_emis": 0.0001,
+            "st_emsd": 0.0001,
+            "st_cdist": 0.01,
+            "st_qa": 0.01
+        }
+
+    for f in filenames:
+        f_name = f.split('/')[-1]
+        out_path = f"{scale_dir}{f_name}"
+
+        # Split the file name to figure out the product
+        file_parts = f_name.split('_')
+        prod_name = f"{file_parts[-2]}_{file_parts[-1][:-4]}".lower()
+
+        # Apply scaling for surface reflectance bands
+        if prod_name.startswith('sr_b'):
+            scale_factor = 0.0000275
+            add_offset = -0.2
+            nodata = 0
+            apply_scale_factor_landsat(f, scale_factor, add_offset, nodata, out_path, new_dtype)
+            logging.info(f"Prod name {prod_name} scaled with scale factor {scale_factor}, offset {add_offset}")
+        
+        # Apply scaling for surface temperature bands
+        elif prod_name.startswith('st_b'):
+            scale_factor = 0.00341802
+            add_offset = 149.0
+            nodata = 0
+            apply_scale_factor_landsat(f, scale_factor, add_offset, nodata, out_path, new_dtype)
+            logging.info(f"Prod name {prod_name} scaled with scale factor {scale_factor}, offset {add_offset}")
+        
+        # Apply scaling for supplementary ST bands
+        elif prod_name in list(scale_factor_map.keys()):
+            scale_factor = scale_factor_map[prod_name]
+            add_offset = 0
+            nodata = -9999
+            apply_scale_factor_landsat(f, scale_factor, add_offset, nodata, out_path, new_dtype)
+            logging.info(f"Prod name {prod_name} scaled with scale factor {scale_factor}, offset {add_offset}")
+        
+        # For any remaining files (QA band, xml, etc.), just copy into new directory
+        else:
+            shutil.copy(f, out_path)
+            logging.info(f"Prod name {prod_name} copied to new directory")
+
+
+def apply_scale_factor_landsat(input_data, scale_factor, add_offset, nodata, out_path, new_dtype='float32'):
+        """
+        Apply the scale factor to a tif of a landsat product.
+        """
+    
+        # Open the tif as xarray to apply scale factor + offset
+        logging.info(f"Scaling {input_data}")
+        img_arr = rxr.open_rasterio(input_data)
+        
+        # Nodata mask (nodata value of 0 for Landsat Collection 2)
+        mask = img_arr.data == nodata
+
+        # Apply the scale factor and offset
+        img_arr_rescaled = img_arr * scale_factor + add_offset
+
+        # New datatype of float32 because new values are often less than 1 
+        img_arr_rescaled = img_arr_rescaled.astype(new_dtype)
+
+        # Making sure any original nodata is still nodata (I think?)
+        img_arr_rescaled.data[mask] = nodata
+
+        # Convert xarray to COG 
+        img_arr_rescaled.rio.to_raster(raster_path = out_path, driver="COG")
 
 
 def conv_lsscene_cogs(untar_dir, cog_dir, overwrite=False):
@@ -412,10 +540,19 @@ def prepareLS(in_scene, s3_bucket='', s3_dir='', prodlevel="", item=""):
     tokens = first_file.split('_')
     scene_name = '_'.join(tokens[:4])
 
+    # Tmp directory to hold everything for scene
     inter_dir = f"{inter_dir}{scene_name}_tmp/"
     os.makedirs(inter_dir, exist_ok=True)
+
+    # Untar directory holds the raw downloaded tifs
     untar_dir = f"{inter_dir}{scene_name}_untar/"
     os.makedirs(untar_dir, exist_ok=True)
+
+    # Scale directory holds the tifs after they are scaled
+    scale_dir = f"{inter_dir}{scene_name}_scale/"
+    os.makedirs(scale_dir, exist_ok=True)
+
+    # COG directory holds the final COGS (after scaling, re-cogging)
     cog_dir = f"{inter_dir}{scene_name}/"
     os.makedirs(cog_dir, exist_ok=True)
 
@@ -433,18 +570,29 @@ def prepareLS(in_scene, s3_bucket='', s3_dir='', prodlevel="", item=""):
             root.exception(f"{scene_name} CANNOT BE FOUND")
             raise Exception('Download Error', e)
 
+        # Scale the data using landsat scale factors
+        try:
+            root.info(f"{scene_name} Rescaling Values")
+            scale_landsat_l2(untar_dir, scale_dir, new_dtype='float32')
+            root.info(f"{scene_name} SCALED")
+        except:
+            root.exception(f"{scene_name} CANNOT BE SCALED")
+            raise Exception('Scaling error', e)
+        
+        # Convert the scaled (cogs) to cogs again
         try:
             root.info(f"{scene_name} Converting COGs")
-            conv_lsscene_cogs(untar_dir, cog_dir)
+            conv_lsscene_cogs(scale_dir, cog_dir)
             root.info(f"{scene_name} COGGED")
         except Exception as e:
             root.exception(f"{scene_name} CANNOT BE COGGED")
             raise Exception('COG Error', e)
 
+        # Copying metadata from untar_dir - should it change after rescaling?
         try:
-            root.info(f"{scene_name} Copying medata")
+            root.info(f"{scene_name} Copying metadata")
             copy_l8_metadata(untar_dir, cog_dir)
-            root.info(f"{scene_name} Copied medata")
+            root.info(f"{scene_name} Copied metadata")
         except Exception as e:
             root.exception(f"{scene_name} metadata not copied")
             raise Exception('Metadata copy error', e)
@@ -466,9 +614,48 @@ def prepareLS(in_scene, s3_bucket='', s3_dir='', prodlevel="", item=""):
             raise Exception('S3  upload error', e)
     except Exception as e:
         logging.error(f"Could not process {scene_name}, {e}")
+    
+    #finally:
+        #clean_up(inter_dir + "download/")
+        #clean_up(inter_dir)
+    
     finally:
-        clean_up(inter_dir + "download/")
-        clean_up(inter_dir)
+        test_env = os.getenv('TEST_ENV', False)
+        # preserving the tmp directory contents for testing (set TEST_ENV env var to anything)
+        if test_env:
+            logging.info(f"finished without clean up")
+        else:
+            logging.info(f"cleaning up {inter_dir}")
+            clean_up(inter_dir)
 
 if __name__ == '__main__':
-    prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-Sarah.Cheesbrough@sa.catapult.org.uk-12022019-042034-386/LT040750721993010401T1-SC20191202114123.tar.gz")
+
+    #No projection, L8/L2 -  'LC08_L2SR_079074_20211207_20211215_02_T1'
+    #prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-09222023-055747-096/LC080790742021120702T1-SC20230922144241.tar.gz")
+
+    # #No projection, L8/L2 - 'LC08_L2SR_082071_20211228_20220105_02_T1'
+    # prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-09222023-055747-096/LC080820712021122802T1-SC20230922143843.tar.gz")
+
+    # #No projection, L8/L2 - 'LC08_L2SR_082071_20211126_20211201_02_T1'
+    # prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-09222023-055747-096/LC080820742021122802T1-SC20230922143838.tar.gz")
+
+    # #No projection, L8/L2 - 'LC08_L2SR_082074_20211228_20220105_02_T1'
+    # prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-09222023-055747-096/LC080810722021122102T1-SC20230922143838.tar.gz")
+
+    # #No projection, L8/L2 - 'LC08_L2SR_081072_20211221_20211229_02_T1'
+    #prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-09222023-055747-096/LC080820712021112602T1-SC20230922143838.tar.gz")
+
+    # #No projection, L7/L2 - 'LE07_L2SP_086067_20060427_20200914_02_T1'
+    #prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-09222023-055747-096/LE070870672006050402T1-SC20230922143839.tar.gz")
+
+    # #No projection, L7/L2 - 'LE07_L2SP_086066_20060427_20200914_02_T1'
+    #prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-09222023-055747-096/LE070860672006042702T1-SC20230922143838.tar.gz")
+
+    # #No projection, L7/L2 - 'LE07_L2SP_087067_20060504_20200914_02_T1'
+    #prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-09222023-055747-096/LE070860662006042702T1-SC20230922143843.tar.gz")
+
+    # # No projection, L5/L2 
+    prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-10022023-081357-181/LT051690712011111702T1-SC20231002131439.tar.gz")
+
+    # # No projection, L5/L2
+    #prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-10022023-081357-181/LT050020722011111502T1-SC20231002131438.tar.gz")
