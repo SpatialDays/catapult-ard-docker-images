@@ -6,6 +6,8 @@ import glob
 import zipfile
 import uuid
 from subprocess import Popen, PIPE, STDOUT
+import shutil
+import rioxarray as rxr
 
 from workflows.utils.prep_utils import *
 
@@ -326,6 +328,73 @@ def s2_ndvi(red_file, nir_file, out_file=False):
 
     return ndvi
 
+def scale_sentinel2_l2a(cog_dir, scale_dir, new_dtype='float32'):
+    """
+    Apply scale factor to Sentinel Level-2A data
+    (Quantification value of 10,000 and no offset value)
+    https://docs.sentinel-hub.com/api/latest/data/sentinel-2-l2a/
+
+    Note: Check on assigning new data type of float32 and converting to COG multiple times.
+    """
+    # All the files in the directory (includes QA bands and xml file)
+    filenames = glob.glob(f"{cog_dir}/*")
+
+    for f in filenames:
+        f_name = f.split('/')[-1]
+        out_path = f"{scale_dir}{f_name}"
+
+        # Split the file name to figure out the product
+        file_parts = f_name.split('_')
+        prod_name = f"{file_parts[-2]}_{file_parts[-1][:-4]}".lower()
+
+        # Apply scaling for surface reflectance bands
+        if f[-11:].startswith('B') and f[-11:].endswith('.tif'):
+            quant_value = 10000
+            boa_offset = 0
+            nodata = 0
+            apply_scale_factor_sentinel(f, quant_value, boa_offset, nodata, out_path, new_dtype)
+            logging.info(f"Prod name {prod_name} scaled with scale factor {quant_value}, offset {boa_offset}")
+        
+        # Apply scaling for AOT band
+        elif f[-11:].startswith('AOT'):
+            quant_value = 1000
+            boa_offset = 0
+            nodata = 0
+            apply_scale_factor_sentinel(f, quant_value, boa_offset, nodata, out_path, new_dtype)
+            logging.info(f"Prod name {prod_name} scaled with scale factor {quant_value}, offset {boa_offset}")
+        
+        # For the remaining files (QA band, xml, etc.), just copy into new directory
+        else:
+            shutil.copy(f, out_path)
+
+def apply_scale_factor_sentinel(input_data, quant_value, boa_offset, nodata, out_path, new_dtype='float32'):
+        """
+        Apply the scale factor to a tif of a sentinel product.
+        """
+    
+        # Open the tif as xarray to apply scale factor + offset
+        logging.info(f"Opening {input_data} as xarray")
+        img_arr = rxr.open_rasterio(input_data)
+        logging.info(f"MIN, MAX BEFORE {img_arr.min()}, {img_arr.max()}")
+        
+        # Nodata mask (nodata value of 0 for Sentinel 2)
+        mask = img_arr.data == nodata
+
+        # Apply the scale factor and offset
+        img_arr_rescaled = img_arr / quant_value + boa_offset
+
+        # New datatype of float32 because new values are often less than 1 
+        img_arr_rescaled = img_arr_rescaled.astype(new_dtype)
+
+        # Making sure any original nodata is still nodata (I think?)
+        img_arr_rescaled.data[mask] = nodata
+
+        logging.info(f"MIN, MAX AFTER {img_arr_rescaled.min()}, {img_arr_rescaled.max()}")
+        logging.info(f"Data-type AFTER: {img_arr_rescaled.dtype}")
+
+        # Convert xarray to COG 
+        img_arr_rescaled.rio.to_raster(raster_path = out_path, driver="COG")
+        logging.info(f"Wrote data to {out_path}")
 
 def yaml_prep_s2(scene_dir):
     """
@@ -405,7 +474,7 @@ def yaml_prep_s2(scene_dir):
 # @click.option("--prodlevel", default="L1C", help="Desired Sentinel-2 product level. Defaults to 'L1C'. Use 'L2A' for ARD equivalent")
 # @click.option("--source", default="gcloud", help="Api source to be used for downloading scenes.")
 
-def prepareS2(title, s3_bucket, s3_dir, inter_dir='/tmp/data/intermediate/',
+def prepareS2(title, s3_bucket='public-eo-data', s3_dir='common_sensing/sentinel_2/', inter_dir='/tmp/data/intermediate/',
               prodlevel='L2A', **kwargs):
     in_scene = title
     """
@@ -439,13 +508,21 @@ def prepareS2(title, s3_bucket, s3_dir, inter_dir='/tmp/data/intermediate/',
     # Unique inter_dir needed for clean-up
     inter_dir = inter_dir + scene_name + '_tmp/'
     os.makedirs(inter_dir, exist_ok=True)
+    
     # sub-dirs used only for accessing tmp files
-    down_dir = inter_dir + in_scene + '/'
+    down_dir = inter_dir + in_scene + '_dwn/'
     if '_MSIL2A_' in in_scene:
         down_dir = inter_dir # don't want nested .SAFE dir
-    os.makedirs(inter_dir, exist_ok=True)
-    cog_dir = inter_dir + scene_name + '/'
+    # Used to be making inter_dir again - changed to create down_dir
+    os.makedirs(down_dir, exist_ok=True) 
+
+    # Make cog directory (same as down_dir for Level 1C)
+    cog_dir = inter_dir + scene_name + '_cog/'
     os.makedirs(cog_dir, exist_ok=True)
+
+    # Make directory for scaled images
+    scale_dir = inter_dir + scene_name + '_scaled/'
+    os.makedirs(scale_dir, exist_ok=True)
 
     root = setup_logging()
 
@@ -489,6 +566,7 @@ def prepareS2(title, s3_bucket, s3_dir, inter_dir='/tmp/data/intermediate/',
                 root.exception(f"{in_scene} {scene_name} sen2cor FAILED")
                 raise Exception('Sen2Cor Error', e)
 
+        
         # CONVERT TO COGS TO TEMP COG DIRECTORY**
         try:
             root.info(f"{in_scene} {scene_name} Converting COGs")
@@ -498,7 +576,16 @@ def prepareS2(title, s3_bucket, s3_dir, inter_dir='/tmp/data/intermediate/',
             root.exception(f"{in_scene} {scene_name} COG conversion FAILED")
             raise Exception('COG Error', e)
 
-            # PARSE METADATA TO TEMP COG DIRECTORY**
+        # SCALE THE COGS 
+        try:
+            root.info(f"{in_scene} {scene_name} Scaling images")
+            scale_sentinel2_l2a(cog_dir, scale_dir, new_dtype='float32')
+            root.info(f"{in_scene} {scene_name} ")
+        except:
+            root.exception(f"{in_scene} {scene_name} Not scaled properly")
+
+
+        # PARSE METADATA TO TEMP COG DIRECTORY**
         try:
             root.info(f"{in_scene} {scene_name} Copying original METADATA")
             copy_s2_metadata(down_dir, cog_dir, scene_name)
@@ -516,6 +603,7 @@ def prepareS2(title, s3_bucket, s3_dir, inter_dir='/tmp/data/intermediate/',
             raise Exception('YAML creation error', e)
 
             # MOVE COG DIRECTORY TO OUTPUT DIRECTORY
+
         try:
             root.info(f"{in_scene} {scene_name} Uploading to S3 Bucket")
             s3_upload_cogs(glob.glob(cog_dir + '*'), s3_bucket, s3_dir)

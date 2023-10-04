@@ -15,7 +15,7 @@ import uuid
 import geopandas as gpd
 import rasterio
 import rasterio.features
-import gdal
+from osgeo import gdal
 
 from workflows.utils.dc_water_classifier import wofs_classify
 from workflows.utils.dc_clean_mask import landsat_qa_clean_mask
