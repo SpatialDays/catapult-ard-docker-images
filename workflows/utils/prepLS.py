@@ -235,8 +235,8 @@ def scale_landsat_l2(untar_dir, scale_dir, new_dtype='float32'):
 
     Note: Check on assigning new data type of float32 and converting to COG multiple times.
     """
-    # All the files in the directory (includes QA bands and xml file)
-    filenames = glob.glob(f"{untar_dir}/*")
+    # All files in the directory (includes QA bands and xml file) but avoids any files in subdirectories
+    filenames = [f for f in glob.glob(f"{untar_dir}/*") if os.path.isfile(f)]
 
     # Variable scale factors for supplementary ST bands
     scale_factor_map = {
@@ -655,7 +655,10 @@ if __name__ == '__main__':
     #prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-09222023-055747-096/LE070860662006042702T1-SC20230922143843.tar.gz")
 
     # # No projection, L5/L2 
-    prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-10022023-081357-181/LT051690712011111702T1-SC20231002131439.tar.gz")
+    #prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-10022023-081357-181/LT051690712011111702T1-SC20231002131439.tar.gz")
 
     # # No projection, L5/L2
     #prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-sabine.a.nix@gmail.com-10022023-081357-181/LT050020722011111502T1-SC20231002131438.tar.gz")
+
+    # Test w/ Ivica's Order
+    prepareLS("https://edclpdsftp.cr.usgs.gov/orders/espa-ivica.matic@spatialdays.com-10062023-060411-208/LC080760712020091002T2-SC20231006110509.tar.gz")
