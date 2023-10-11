@@ -588,7 +588,7 @@ def prepareS2(title, s3_bucket='public-eo-data', s3_dir='common_sensing/sentinel
         # PARSE METADATA TO TEMP COG DIRECTORY**
         try:
             root.info(f"{in_scene} {scene_name} Copying original METADATA")
-            copy_s2_metadata(down_dir, cog_dir, scene_name)
+            copy_s2_metadata(down_dir, scale_dir, scene_name)
             root.info(f"{in_scene} {scene_name} COPIED original METADATA")
         except:
             root.exception(f"{in_scene} {scene_name} MTD not coppied")
@@ -596,17 +596,16 @@ def prepareS2(title, s3_bucket='public-eo-data', s3_dir='common_sensing/sentinel
         # GENERATE YAML WITHIN TEMP COG DIRECTORY**
         try:
             root.info(f"{in_scene} {scene_name} Creating dataset YAML")
-            create_yaml(cog_dir, yaml_prep_s2(cog_dir))
+            create_yaml(scale_dir, yaml_prep_s2(scale_dir))
             root.info(f"{in_scene} {scene_name} Created original METADATA")
         except Exception as e:
             root.exception(f"{in_scene} {scene_name} Dataset YAML not created")
             raise Exception('YAML creation error', e)
 
             # MOVE COG DIRECTORY TO OUTPUT DIRECTORY
-
         try:
             root.info(f"{in_scene} {scene_name} Uploading to S3 Bucket")
-            s3_upload_cogs(glob.glob(cog_dir + '*'), s3_bucket, s3_dir)
+            s3_upload_cogs(glob.glob(scale_dir + '*'), s3_bucket, s3_dir)
             root.info(f"{in_scene} {scene_name} Uploaded to S3 Bucket")
         except Exception as e:
             root.exception(f"{in_scene} {scene_name} Upload to S3 Failed")
