@@ -521,7 +521,7 @@ def prepareS2(title, s3_bucket='public-eo-data', s3_dir='common_sensing/sentinel
     os.makedirs(cog_dir, exist_ok=True)
 
     # Make directory for scaled images
-    scale_dir = inter_dir + scene_name + '_scaled/'
+    scale_dir = inter_dir + scene_name + '/'
     os.makedirs(scale_dir, exist_ok=True)
 
     root = setup_logging()
