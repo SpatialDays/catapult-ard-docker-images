@@ -196,19 +196,19 @@ def band_name_l8(prod_path):
     prod_map = {
         "pixel_qa": 'pixel_qa',
         "radsat_qa": 'radsat_qa',
-        "band1": 'blue',
-        "band2": 'green',
-        "band3": 'red',
-        "band4": 'nir',
-        "band5": 'swir1',
-        "band6": 'thermal',
+        "band1": 'coastal_aerosol',
+        "band2": 'blue',
+        "band3": 'green',
+        "band4": 'red',
+        "band5": 'nir',
+        "band6": 'swir1',
         "band7": 'swir2',
-        "b1": 'blue',
-        "b2": 'green',
-        "b3": 'red',
-        "b4": 'nir',
-        "b5": 'swir1',
-        "b6": 'thermal',
+        "b1": 'coastal_aerosol',
+        "b2": 'blue',
+        "b3": 'green',
+        "b4": 'red',
+        "b5": 'nir',
+        "b6": 'swir1',
         "b7": 'swir2',
         "qa_radsat": 'radsat_qa',
         "qa_pixel": 'pixel_qa',
@@ -588,7 +588,6 @@ def prepareLS(in_scene, s3_bucket='', s3_dir='', prodlevel="", item=""):
             root.exception(f"{scene_name} CANNOT BE COGGED")
             raise Exception('COG Error', e)
 
-        # Copying metadata from untar_dir - should it change after rescaling?
         try:
             root.info(f"{scene_name} Copying metadata")
             copy_l8_metadata(untar_dir, cog_dir)
