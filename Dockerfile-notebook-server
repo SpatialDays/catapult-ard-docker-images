@@ -1,0 +1,8 @@
+FROM ivicamaticsd/catapult-ard-docker-images:master
+
+RUN pip install notebook
+EXPOSE 8888
+WORKDIR /notebooks
+
+CMD ["jupyter", "notebook", "--ip='*'", "--port=8888", "--no-browser", "--allow-root"]
+
